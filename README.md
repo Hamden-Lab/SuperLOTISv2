@@ -11,3 +11,7 @@ Repo containing code for SuperLOTIS upgrade (SOPHIA camera, Pfeiffer Vacuum Pump
 
 ## Reinstall the package
 pip install -e .
+
+## ToDo
+* Remember to include PDU IP address and port to constants.py
+* remember to include outlet address for all items on PDU to contstants.py
