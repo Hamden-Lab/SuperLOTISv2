@@ -7,6 +7,7 @@ Repo containing code for SuperLOTIS upgrade (SOPHIA camera, Pfeiffer Vacuum Pump
 * pyserial: for the INFICON
 * pylablib: for the SOPHIA camera
 * paramiko: SSH session
+* cyberpower: github repo for communicating with CyberPower PDU41001
 
 ## Reinstall the package
 pip install -e .
