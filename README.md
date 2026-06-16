@@ -1,6 +1,11 @@
 # SuperLOTISv2
 Repo containing code for SuperLOTIS upgrade (SOPHIA camera, Pfeiffer Vacuum Pump and INFICON Vacuum Gauge)
 
+## Architecture
+* Python scripts to control/command/communicate with devices directly are located in `drivers/`
+* Intermediate socket-based interface are located in `clients/`
+* Constants and other useful functions are located in `tools/`
+
 ## Requirements
 * Python 3.14
 * opcua: for the Pfeiffer Vacuum Pump

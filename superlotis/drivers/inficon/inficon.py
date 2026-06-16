@@ -1,6 +1,6 @@
 import serial
 import struct
-
+from superlotis.tools.constants import PCG550_SERIAL_PORT
 
 class PxG55xRS485:
     """
@@ -200,3 +200,10 @@ class PxG55xRS485:
             4 = Counts
         """
         self.write_pid(224, bytes([unit]))
+
+if __name__ == "__main__":
+    gauge = PxG55xRS485(port=PCG550_SERIAL_PORT)
+    print("Serial number:", gauge.get_serial_number())
+    print("Product name:", gauge.get_product_name())
+    print("Pressure (real):", gauge.get_pressure_real())
+    print("Pressure (fixed):", gauge.get_pressure_fixed())

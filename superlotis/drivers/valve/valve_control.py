@@ -1,4 +1,4 @@
-import cyberpower.cyberpower as cp
+from superlotis.drivers import cyberpower as cp
 
 class valve(object):
 

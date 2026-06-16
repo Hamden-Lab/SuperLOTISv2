@@ -1,7 +1,9 @@
 # CyberPower PDU41001
-# PDU41001_IP_ADDRESS = ""
-# PDU41001_USER = ""
-# PDU41001_PASSWORD = ""
+# By default, user name: cyber, password: cyber)
+PDU41001_IP_ADDRESS = "192.168.1.101"
+PDU41001_USER = "cyber"
+PDU41001_PASSWORD = "cyber"
+
 # VALVE_OUTLET = 1
 
 # Inficon Vacuum Gauge
@@ -10,6 +12,10 @@
 
 # PUMP_INFICON_VACUUM_GAUGE_IP_ADDRESS = "" ""
 # PUMP_INFICON_VACUUM_GAUGE_PORT = ""
+
+# PSG550 INFICON Vacuum Gauge
+PSG550_SERIAL_PORT = "/dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_3ee77d5665faea11995b0a496beb32a7-if00-port0"
+PCG550_SERIAL_PORT = "/dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_3ee77d5665faea11995b0a496beb32a7-if00-port0"
 
 # Lantronix Filter Wheel
 FILTER_WHEEL_IP_ADDRESS = "140.252.86.88"
