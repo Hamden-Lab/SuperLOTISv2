@@ -16,6 +16,8 @@ if str(ROOT_DIR) not in sys.path:
 
 from superlotis.drivers.inficon.inficon import PxG55xRS485
 
+from superlotis.tools.constants import SLOTIS_STATUS_SERVER_IP_ADDRESS, SLOTIS_STATUS_SERVER_PORT
+
 UDP_HOST = "0.0.0.0"
 UDP_PORT = 5150
 SCAN_TIMEOUT = 2.0
@@ -214,8 +216,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Inficon client with optional UDP server and streaming mode.")
     parser.add_argument("--server-host", default=UDP_HOST, help="Local UDP server host to listen on.")
     parser.add_argument("--server-port", type=int, default=UDP_PORT, help="Local UDP server port to listen on.")
-    parser.add_argument("--stream-host", help="Remote UDP server host to stream pressure measurements to.")
-    parser.add_argument("--stream-port", type=int, help="Remote UDP server port to stream pressure measurements to.")
+    parser.add_argument("--stream-host", default=SLOTIS_STATUS_SERVER_IP_ADDRESS, help="Remote UDP server host to stream pressure measurements to.")
+    parser.add_argument("--stream-port", type=int, default=SLOTIS_STATUS_SERVER_PORT, help="Remote UDP server port to stream pressure measurements to.")
     parser.add_argument("--interval", type=float, default=1.0, help="Pressure measurement interval in seconds.")
     return parser.parse_args()
 
