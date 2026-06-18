@@ -72,12 +72,8 @@ class PxG55xRS485:
     # Low-level communication
     # ------------------------------------------------------------------
 
-    def _send_old(self, frame: bytes):
-        self.ser.reset_input_buffer()
-        self.ser.write(frame)
-
     def _send(self, frame):
-        print("TX:", frame.hex(" "))
+        # print("TX:", frame.hex(" "))
         self.ser.reset_input_buffer()
         self.ser.write(frame)
 
@@ -207,8 +203,11 @@ class PxG55xRS485:
         self.write_pid(224, bytes([unit]))
 
 if __name__ == "__main__":
-    gauge = PxG55xRS485(port=PSG550_SERIAL_PORT)
-    # print("Serial number:", gauge.get_serial_number())
-    # print("Product name:", gauge.get_product_name())
-    # print("Pressure (real):", gauge.get_pressure_real())
-    # print("Pressure (fixed):", gauge.get_pressure_fixed())
+    gauge1 = PxG55xRS485(port=PSG550_SERIAL_PORT)
+    gauge2 = PxG55xRS485(port=PCG550_SERIAL_PORT)
+    for gauge in [gauge1, gauge2]:
+        print("=============GAUGE==============")
+        print("Serial number:", gauge.get_serial_number())
+        print("Product name:", gauge.get_product_name())
+        print("Pressure (real):", gauge.get_pressure_real())
+        print("Pressure (fixed):", gauge.get_pressure_fixed())
