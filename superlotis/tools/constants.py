@@ -14,7 +14,7 @@ PDU41001_PASSWORD = "cyber"
 # PUMP_INFICON_VACUUM_GAUGE_PORT = ""
 
 # PSG550 INFICON Vacuum Gauge
-PSG550_SERIAL_PORT = "/dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_3ee77d5665faea11995b0a496beb32a7-if00-port0"
+PSG550_SERIAL_PORT = "/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_BG01XA1Z-if00-port0"
 PCG550_SERIAL_PORT = "/dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_3ee77d5665faea11995b0a496beb32a7-if00-port0"
 
 # Lantronix Filter Wheel

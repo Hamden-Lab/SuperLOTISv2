@@ -1,6 +1,6 @@
 import serial
 import struct
-from superlotis.tools.constants import PCG550_SERIAL_PORT
+from superlotis.tools.constants import PCG550_SERIAL_PORT, PSG550_SERIAL_PORT
 
 class PxG55xRS485:
     """
@@ -19,8 +19,8 @@ class PxG55xRS485:
         self,
         port,
         baudrate=57600,
-        address=0,
-        timeout=1.0,
+        address=1,
+        timeout=5.0,
     ):
         self.address = address
 
@@ -72,7 +72,12 @@ class PxG55xRS485:
     # Low-level communication
     # ------------------------------------------------------------------
 
-    def _send(self, frame: bytes):
+    def _send_old(self, frame: bytes):
+        self.ser.reset_input_buffer()
+        self.ser.write(frame)
+
+    def _send(self, frame):
+        print("TX:", frame.hex(" "))
         self.ser.reset_input_buffer()
         self.ser.write(frame)
 
@@ -202,8 +207,8 @@ class PxG55xRS485:
         self.write_pid(224, bytes([unit]))
 
 if __name__ == "__main__":
-    gauge = PxG55xRS485(port=PCG550_SERIAL_PORT)
-    print("Serial number:", gauge.get_serial_number())
-    print("Product name:", gauge.get_product_name())
-    print("Pressure (real):", gauge.get_pressure_real())
-    print("Pressure (fixed):", gauge.get_pressure_fixed())
+    gauge = PxG55xRS485(port=PSG550_SERIAL_PORT)
+    # print("Serial number:", gauge.get_serial_number())
+    # print("Product name:", gauge.get_product_name())
+    # print("Pressure (real):", gauge.get_pressure_real())
+    # print("Pressure (fixed):", gauge.get_pressure_fixed())
