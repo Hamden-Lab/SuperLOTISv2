@@ -12,7 +12,7 @@ from superlotis.tools.constants import PDU41001_IP_ADDRESS, PDU41001_PASSWORD, P
 logger = logging.getLogger(__name__)
 
 
-class CyberPower:
+class PDU41001(object):
     
     KEX_ALGORITHM = "diffie-hellman-group-exchange-sha256"
     KEY_TYPE = "ssh-rsa"
@@ -62,7 +62,7 @@ class CyberPower:
         self.channel.get_pty()
         self.channel.invoke_shell()
         output = self._recv_until(self.PROMPT).splitlines()
-        return "\n".join(output[:-1])
+        # return "\n".join(output[:-1])
 
     def is_open(self) -> bool:
         """True if the connection is open; False otherwise."""
@@ -99,6 +99,44 @@ class CyberPower:
         output = self._recv_until(self.PROMPT).splitlines()
         output.pop()
         return "\n".join(output)
+    
+    def run_as_dict(self, command: str) -> Mapping[str, object]:
+        """Run a command and parse its output into a dictionary."""
+
+        response = self.run(command)
+
+        result: dict[str, object] = {}
+        current_section: dict[str, str] | None = None
+        section_name: str | None = None
+
+        for line in response.splitlines():
+            line = line.strip()
+
+            if not line:
+                continue
+
+            # Skip separator lines
+            if set(line) == {"-"}:
+                continue
+
+            # Section header (e.g. "Load", "Utility")
+            if ":" not in line:
+                section_name = re.sub(r"\s+", "_", line.lower())
+                current_section = {}
+                result[section_name] = current_section
+                continue
+
+            key, value = (part.strip() for part in line.split(":", 1))
+
+            key = re.sub(r"\s+", "_", key.lower())
+            value = re.sub(r"\s+", " ", value)
+
+            if current_section is not None:
+                current_section[key] = value
+            else:
+                result[key] = value
+
+        return result
 
     def get_status(
         self, outlet: Optional[Union[int, str]] = None
@@ -130,6 +168,42 @@ class CyberPower:
             ):
                 status.append(m.groupdict())
         return sorted(status, key=lambda o: o["index"])
+    
+    def get_power_usage(self) -> Mapping[str, Mapping[str, str]]:
+        """Get current power usage statistics."""
+
+        response = self.run("devsta show")
+
+        result: dict[str, dict[str, str]] = {}
+        section: str | None = None
+
+        for line in response.splitlines():
+            line = line.strip()
+
+            if not line:
+                continue
+
+            # Skip separator lines
+            if set(line) == {"-"}:
+                continue
+
+            # Section header
+            if ":" not in line:
+                section = line.lower()
+                result[section] = {}
+                continue
+
+            if section is None:
+                continue
+
+            key, value = (part.strip() for part in line.split(":", 1))
+
+            key = re.sub(r"\s+", "_", key.lower())
+            value = re.sub(r"\s+", " ", value)
+
+            result[section][key] = value
+
+        return result
 
     def power_on(self, outlet: Optional[Union[int, str]] = None) -> str:
         """Power on the specified outlet (or all outlets if unspecified).
@@ -180,5 +254,6 @@ class CyberPower:
         return results
 
 if __name__ == "__main__":
-    c = CyberPower(host=PDU41001_IP_ADDRESS, user=PDU41001_USER, password=PDU41001_PASSWORD)
-    # print(c.get_status())
+    pdu = PDU41001(host=PDU41001_IP_ADDRESS, user=PDU41001_USER, password=PDU41001_PASSWORD)
+    pdu.connect()
+    pdu.get_status()

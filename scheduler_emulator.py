@@ -1,11 +1,10 @@
 import socket
-from superlotis.tools.constants import SOPHIA_IP_ADDRESS, SOPHIA_PORT
+from superlotis.tools.constants import PDU41001_SOCKET_IP_ADDRESS, PDU41001_SOCKET_PORT
 
-HOST = SOPHIA_IP_ADDRESS
-PORT = SOPHIA_PORT
+HOST = PDU41001_SOCKET_IP_ADDRESS
+PORT = PDU41001_SOCKET_PORT
 
-
-data = "get exptime"
+data = "power off 2"
 
 # SOCK_DGRAM is the socket type to use for UDP sockets
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

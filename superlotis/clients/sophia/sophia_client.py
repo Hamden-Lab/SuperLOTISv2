@@ -1,6 +1,5 @@
 from superlotis.drivers.sophia.sophia import SOPHIA
 from superlotis.tools.constants import SOPHIA_FRAME_TIMEOUT, SOPHIA_IP_ADDRESS, SOPHIA_PORT
-
 import socketserver
 
 

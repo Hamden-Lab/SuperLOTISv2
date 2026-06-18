@@ -7,16 +7,19 @@ Repo containing code for SuperLOTIS upgrade (SOPHIA camera, Pfeiffer Vacuum Pump
 * Constants and other useful functions are located in `tools/`
 
 ## Requirements
-* Python 3.14
+* Miniconda + Python 3.14
 * opcua: for the Pfeiffer Vacuum Pump
 * pyserial: for the INFICON
 * pylablib: for the SOPHIA camera
 * paramiko: SSH session
-* cyberpower: github repo for communicating with CyberPower PDU41001
+* typing-extensions
+* keyring
 
 ## Reinstall the package
 pip install -e .
 
-## ToDo
-* Remember to include PDU IP address and port to constants.py
-* remember to include outlet address for all items on PDU to contstants.py
+## TODO
+- [] remember to include outlet address for all items on PDU to contstants.py
+- [] set up NTP time server for PDU in order to have correct timing for logs
+- timeout of pdu is only 10 minutes max before logging off (see page 63 timeout). KS extend it to 10 minutes from the default 3 minutes.
+- write a windows bat file script that create a bunch of CMD terminals for each device driver + client with colours and paths
