@@ -1,8 +1,8 @@
 # CyberPower PDU41001
 # By default, user name: cyber, password: cyber)
 PDU41001_IP_ADDRESS = "192.168.1.101"
-PDU41001_USER = "cyber"
-PDU41001_PASSWORD = "cyber"
+PDU41001_USER = "superlotis"
+PDU41001_PASSWORD = "lotis@553LAB"
 
 # VALVE_OUTLET = 1
 

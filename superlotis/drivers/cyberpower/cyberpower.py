@@ -52,7 +52,7 @@ class CyberPower:
         t = Transport(self.host)
         o = t.get_security_options()
         o.kex = (self.KEX_ALGORITHM,)
-        o.key_types = (self.KEY_TYPE,)
+        # o.key_types = (self.KEY_TYPE,)
         t.set_keepalive(self.KEEPALIVE_INTERVAL)
 
         t.start_client()
@@ -181,4 +181,4 @@ class CyberPower:
 
 if __name__ == "__main__":
     c = CyberPower(host=PDU41001_IP_ADDRESS, user=PDU41001_USER, password=PDU41001_PASSWORD)
-    print(c.get_status())
+    # print(c.get_status())
