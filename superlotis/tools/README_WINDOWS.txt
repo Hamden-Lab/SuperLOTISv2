@@ -51,3 +51,8 @@ pip install paramiko ipython typing-extensions pylablib pyserial keyring
 conda create -n superlotis python=3.14
 
 https://catherineh.github.io/programming/2016/06/07/mimicking-udev-rules-with-pyserial
+
+
+
+ssh slotis@slotis.kpno.noirlab.edu
+AzTEC!SNe
