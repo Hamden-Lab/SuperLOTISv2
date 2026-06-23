@@ -56,3 +56,12 @@ https://catherineh.github.io/programming/2016/06/07/mimicking-udev-rules-with-py
 
 ssh slotis@slotis.kpno.noirlab.edu
 AzTEC!SNe
+
+
+
+Each device client script is checking the "scheduler host server" and looking for its FLAG (e.g., for example SLOTIS FILTER for the filter wheel).
+Then, it checks the key time contained in the scheduler command row and compares it the current time.
+
+- scheduler_loader.pl : reading the schedule scripts and sending it to the scheduler host server ran in slotis_scheduler.pl
+- slotis_scheduler.pl : hosting all the commands that need to be executed during the observation night.
+- device_client.pl/py : sending status information to the slotis_status_server + interpreting and transfering commands read from the slotis_scheduler (smart way = identifying FLAG + managing the execution time by comparing it with now to what is contained in the scheduler line) host server to the actual device through serial or ethernet.

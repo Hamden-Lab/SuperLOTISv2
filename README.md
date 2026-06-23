@@ -19,8 +19,11 @@ Repo containing code for SuperLOTIS upgrade (SOPHIA camera, Pfeiffer Vacuum Pump
 pip install -e .
 
 ## TODO
+- [] manage the timing of the scheduler lines now, now + 30, etc.
+- [X] find a way to end the threads properly (both socket server and polling) 
+- [X] how to keep data persistent on the scheduler socket server ? 
+- [] why apache2 server installation has root access required to edit php pages ?
 - [] remember to include outlet address for all items on PDU to contstants.py
 - [] set up NTP time server for PDU in order to have correct timing for logs
-- [] remember to modify client scripts for communications with scheduler and status servers if necessary (inficon, sophia)
-- timeout of pdu is only 10 minutes max before logging off (see page 63 timeout). KS extend it to 10 minutes from the default 3 minutes.
+- [X] timeout of pdu is only 10 minutes max before logging off (see page 63 timeout). KS extend it to 10 minutes from the default 3 minutes.
 - write a windows bat file script that create a bunch of CMD terminals for each device driver + client with colours and paths
