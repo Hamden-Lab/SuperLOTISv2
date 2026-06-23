@@ -10,7 +10,7 @@ SLOTIS_STATUS_SERVER_PORT = 5135
 
 # =================== SOPHIA =================== 
 # Variables with _SOCKET_PORT represent the port used for socket communication of the device. Idem for _SOCKET_IP_ADDRESS.
-# VALVE_OUTLET = 1
+VALVE_OUTLET = 1
 
 # The local IP address of the SOPHIA computer
 LYMAN_COMPUTER_IP_ADDRESS = "127.0.0.1"
