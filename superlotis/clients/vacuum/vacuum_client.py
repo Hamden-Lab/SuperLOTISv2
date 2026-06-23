@@ -12,7 +12,7 @@ from superlotis.drivers.pfeiffer.pfeiffer_controller import Controller, Pump
 from superlotis.tools.constants import (
     PDU41001_IP_ADDRESS,
     PDU41001_PASSWORD,
-    PDU41001_SOCKET_IP_ADDRESS,
+    VALVE_OUTLET,
     PDU41001_USER,
     SLOTIS_SCHEDULER_IP_ADDRESS,
     SLOTIS_SCHEDULER_PORT,
@@ -221,7 +221,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--inficon-host", default="127.0.0.1", help="Inficon client UDP host.")
     parser.add_argument("--inficon-port", type=int, default=5150, help="Inficon client UDP port.")
     parser.add_argument("--inficon-gauge", default="PSG550", help="Inficon gauge label to poll for pressure.")
-    parser.add_argument("--pdu-outlet", type=int, default=2, help="PDU outlet to switch on/off.")
+    parser.add_argument("--valve-outlet", type=int, default=VALVE_OUTLET, help="Valve outlet to switch on/off.")
     parser.add_argument("--pfeiffer-url", default="opc.tcp://127.0.0.1:4840", help="OPC UA URL for the Pfeiffer controller.")
     parser.add_argument("--tc80-on-pressure", type=float, default=0.1, help="Pressure threshold (same units as Inficon) to turn on TC80.")
     parser.add_argument("--pdu-on-pressure", type=float, default=0.01, help="Pressure threshold to turn on the PDU outlet.")
