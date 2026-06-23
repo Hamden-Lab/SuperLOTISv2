@@ -20,14 +20,14 @@
 import socketserver
 from pathlib import Path
 from threading import Lock
-from superlotis.tools.constants import LYMAN_COMPUTER_IP_ADDRESS, SLOTIS_SCHEDULER_PORT
+from superlotis.tools.constants import TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT
 
 # =========================================================
 # CONFIG
 # =========================================================
 
-HOST = LYMAN_COMPUTER_IP_ADDRESS
-PORT = SLOTIS_SCHEDULER_PORT
+HOST = TEST_SCHEDULER_SERVER_HOST
+PORT = TEST_SCHEDULER_SERVER_PORT
 
 # =========================================================
 # SHARED DATA
