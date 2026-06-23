@@ -1,146 +1,451 @@
 from superlotis.drivers.pdu41001 import pdu41001
-from superlotis.tools.constants import PDU41001_IP_ADDRESS, PDU41001_USER, PDU41001_PASSWORD, PDU41001_SOCKET_IP_ADDRESS, PDU41001_SOCKET_PORT
+from superlotis.tools.constants import PDU41001_IP_ADDRESS, PDU41001_USER, PDU41001_PASSWORD, PDU41001_SOCKET_IP_ADDRESS, PDU41001_SOCKET_PORT, LYMAN_COMPUTER_IP_ADDRESS, SLOTIS_SCHEDULER_PORT, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL
+import socket
 import socketserver
+import threading
+import time
 import logging
 from pathlib import Path
 
-# To identify whate device is replying on the socket
-DEVICE_ID = "PDU41001"
-# Socket server parameters
-HOST = PDU41001_SOCKET_IP_ADDRESS
-PORT = PDU41001_SOCKET_PORT
+# =========================================================
+# CONFIG
+# =========================================================
 
-# Log file path
+# Identification string of the device for logging
+DEVICE_ID = "PDU41001"
+
+# Device socket server
+DEVICE_SERVER_HOST = PDU41001_SOCKET_IP_ADDRESS
+DEVICE_SERVER_PORT = PDU41001_SOCKET_PORT
+
+# =========================================================
+# LOGGING
+# =========================================================
+
 LOG_FILE = Path("pdu41001_client.log")
-# Logging parameters
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
     handlers=[
         logging.FileHandler(LOG_FILE),
-        logging.StreamHandler()  # also keep output in terminal
+        logging.StreamHandler()
     ]
 )
+
 logger = logging.getLogger(__name__)
 
+# =========================================================
+# PDU COMMAND PROCESSING
+# =========================================================
 
 def process_command(command):
 
-    command = command.decode("utf-8").strip()
+    command = command.strip()
 
-    # The socket is closed for the PDU side every 10 minutes.
-    # Need to check and reopen manually.
-    if pdu.is_open() == False:
+    logger.info("%s: processing '%s'", DEVICE_ID, command)
+
+    # reconnect if needed
+    if not pdu.is_open():
+        logger.warning("%s: reconnecting SSH", DEVICE_ID)
         pdu.connect()
 
-    # power on <outlet>
-    if command.startswith("power on "):
+    # =====================================================
+    # power on
+    # =====================================================
+
+    if command.startswith("poweron "):
+
         try:
-            outlet = int(command.split()[2])
-            logger.info("%s: power on outlet %d", DEVICE_ID, outlet)
+            outlet = int(command.split()[1])
+
+            logger.info(
+                "%s: power on outlet %d",
+                DEVICE_ID,
+                outlet
+            )
+
             pdu.power_on(outlet=outlet)
-            return f"outlet {outlet} on".encode("utf-8")
-        except (IndexError, ValueError):
-            logger.warning("%s: Invalid outlet number in '%s'", DEVICE_ID, command)
-            return f"Invalid outlet number".encode("utf-8")
-        
-    # power off <outlet>
-    elif command.startswith("power off "):
+
+            return f"outlet {outlet} on"
+
+        except Exception:
+            logger.exception("%s: poweron failed", DEVICE_ID)
+            return "error"
+
+    # =====================================================
+    # power off
+    # =====================================================
+
+    elif command.startswith("poweroff "):
+
         try:
-            outlet = int(command.split()[2])
-            logger.info("%s: power off outlet %d", DEVICE_ID, outlet)
+            outlet = int(command.split()[1])
+
+            logger.info(
+                "%s: power off outlet %d",
+                DEVICE_ID,
+                outlet
+            )
+
             pdu.power_off(outlet=outlet)
-            return f"outlet {outlet} off".encode("utf-8")
-        except (IndexError, ValueError):
-            logger.warning("%s: Invalid outlet number in '%s'", DEVICE_ID, command)
-            return f"Invalid outlet number".encode("utf-8")
-        
-    # reboot <outlet>
+
+            return f"outlet {outlet} off"
+
+        except Exception:
+            logger.exception("%s: poweroff failed", DEVICE_ID)
+            return "error"
+
+    # =====================================================
+    # reboot
+    # =====================================================
+
     elif command.startswith("reboot "):
+
         try:
-            outlet = int(command.split()[2])
-            logger.info("%s: reboot outlet %d", DEVICE_ID, outlet)
+            outlet = int(command.split()[1])
+
+            logger.info(
+                "%s: reboot outlet %d",
+                DEVICE_ID,
+                outlet
+            )
+
             pdu.reboot(outlet=outlet)
-            return f"outlet {outlet} reboot".encode("utf-8")
-        except (IndexError, ValueError):
-            logger.warning("%s: Invalid outlet number in '%s'", DEVICE_ID, command)
-            return f"Invalid outlet number".encode("utf-8")
 
+            return f"outlet {outlet} reboot"
+
+        except Exception:
+            logger.exception("%s: reboot failed", DEVICE_ID)
+            return "error"
+
+    # =====================================================
     # get status
+    # =====================================================
+
     elif command.startswith("get status "):
+
         try:
             outlet = int(command.split()[2])
-            logger.info("%s: get status outlet %d", DEVICE_ID, outlet)
+
             status = pdu.get_status(outlet=outlet)
-            return f"outlet {outlet} status {status}".encode("utf-8")
-        except (IndexError, ValueError):
-            logger.warning("%s: Invalid outlet number in '%s'", DEVICE_ID, command)
-            return f"Invalid outlet number".encode("utf-8")
 
-    # get power usage
+            logger.info(
+                "%s: outlet %d status %s",
+                DEVICE_ID,
+                outlet,
+                status
+            )
+
+            return f"outlet {outlet} status {status}"
+
+        except Exception:
+            logger.exception("%s: get status failed", DEVICE_ID)
+            return "error"
+
+    # =====================================================
+    # get powerusage
+    # =====================================================
+
     elif command == "get powerusage":
-        try:
-            outlet = int(command.split()[2])
-            logger.info("%s: get powerusage", DEVICE_ID)
-            power_usage = pdu.get_power_usage()['load']['device_load']
-            return f"power usage {power_usage}".encode("utf-8")
-        except (IndexError, ValueError):
-            logger.warning("%s: Invalid outlet number in '%s'", DEVICE_ID, command)
-            return f"Invalid outlet number".encode("utf-8")
 
-    return b"Unknown command"
-    
+        try:
+            power_usage = pdu.get_power_usage()['load']['device_load']
+
+            logger.info(
+                "%s: power usage %s",
+                DEVICE_ID,
+                power_usage
+            )
+
+            return f"power usage {power_usage}"
+
+        except Exception:
+            logger.exception("%s: powerusage failed", DEVICE_ID)
+            return "error"
+
+    return "unknown command"
+
+
+# =========================================================
+# LOCAL UDP SOCKET SERVER
+# =========================================================
 
 class MyUDPHandler(socketserver.BaseRequestHandler):
 
     def handle(self):
+
         data = self.request[0].strip()
-        socket = self.request[1]
+        sock = self.request[1]
+
+        command = data.decode("utf-8", errors="replace")
 
         logger.info(
-            "%s: %s sent: %s",
+            "%s: received local socket command '%s'",
             DEVICE_ID,
-            self.client_address[0],
-            data.decode("utf-8", errors="replace")
+            command
         )
 
         try:
-            res = process_command(data)
 
-            logger.info(
-                "%s: response: %s",
-                DEVICE_ID,
-                res.decode("utf-8", errors="replace")
-            )
+            result = process_command(command)
 
-            socket.sendto(res, self.client_address)
-
-        except Exception:
-            logger.exception("%s: error processing request", DEVICE_ID)
-            socket.sendto(
-                f"{DEVICE_ID}: Internal server error".encode("utf-8"),
+            sock.sendto(
+                result.encode("utf-8"),
                 self.client_address
             )
 
+        except Exception:
+
+            logger.exception("%s: socket request failed", DEVICE_ID)
+
+            sock.sendto(
+                b"internal server error",
+                self.client_address
+            )
+
+
+class UDPServerThread:
+
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.server = socketserver.ThreadingUDPServer(
+            (self.host, self.port),
+            MyUDPHandler
+        )
+
+        self.thread = threading.Thread(
+            target=self.server.serve_forever,
+            daemon=True
+        )
+
+    def start(self):
+
+        logger.info(
+            "%s: local UDP server started on %s:%s",
+            DEVICE_ID,
+            self.host,
+            self.port
+        )
+
+        self.thread.start()
+
+    def stop(self):
+
+        logger.info("%s: stopping UDP server", DEVICE_ID)
+
+        self.server.shutdown()      # stop serve_forever()
+        self.server.server_close()  # close socket
+        self.thread.join()          # wait for thread exit
+
+        logger.info("%s: UDP server stopped", DEVICE_ID)
+
+# =========================================================
+# SOCKET CLIENT TO POLL SCHEDULER SERVER
+# =========================================================
+
+class SchedulerPoller(object):
+
+    def __init__(self, host, port, timeout=5, poll_interval=SLOTIS_SCHEDULER_POLL_INTERVAL):
+        logger.info(
+            "%s: starting master polling thread",
+            DEVICE_ID
+        )
+        self.host = host
+        self.port = port
+        self.client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.timeout = timeout
+        self.poll_interval = poll_interval
+        self.client.settimeout(self.timeout)
+
+    def start_polling_scheduler_server(self):
+        self._polling_scheduler_server = True
+        self.poll_scheduler_server_thread = threading.Thread(target=self.poll_scheduler)
+        self.poll_scheduler_server_thread.start()
+        logger.info(
+            "%s: START SCHEDULER SERVER POLLING THREAD",
+            DEVICE_ID
+        )
+
+    def stop_polling_scheduler_server(self):
+        self._polling_scheduler_server = False
+        self.poll_scheduler_server_thread.join()
+        logger.info(
+            "%s: STOP SCHEDULER SERVER POLLING THREAD",
+            DEVICE_ID
+        )
+
+    def poll_scheduler(self):
+
+        while self._polling_scheduler_server:
+
+            try:
+
+                # request all commands
+                self.client.sendto(b"/all", (self.host, self.port))
+
+                # receive response
+                response, _ = self.client.recvfrom(8192)
+
+                decoded = response.decode("utf-8")
+
+                logger.info(
+                    "%s: received master data:\n%s",
+                    DEVICE_ID,
+                    decoded
+                )
+
+                # process line by line
+                lines = decoded.strip().splitlines()
+
+                for line in lines:
+
+                    line = line.strip()
+
+                    if not line:
+                        continue
+
+                    logger.info(
+                        "%s: parsing line '%s'",
+                        DEVICE_ID,
+                        line
+                    )
+
+                    # Example:
+                    # now 0 SLOTIS PDU poweroff 2
+
+                    parts = line.split()
+
+                    if len(parts) < 5:
+                        continue
+
+                    # extract actual command
+                    # poweroff 2
+                    cmd = " ".join(parts[4:])
+
+                    process_command(cmd)
+
+            except Exception:
+                logger.exception(
+                    "%s: polling failed",
+                    DEVICE_ID
+                )
+
+            time.sleep(self.poll_interval)
+
+# =========================================================
+# 
+# =========================================================
+
+
+class OutletStatusReporter:
+
+    def __init__(self, host, port, interval=10):
+        self.host = host
+        self.port = port
+        self.interval = interval
+        self.client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    def start(self):
+        self._running = True
+        self.thread = threading.Thread(
+            target=self.report_loop,
+            daemon=True
+        )
+        self.thread.start()
+
+        logger.info(
+            "%s: START OUTLET STATUS REPORTER THREAD",
+            DEVICE_ID
+        )
+
+    def stop(self):
+        self._running = False
+        self.thread.join()
+
+        logger.info(
+            "%s: STOP OUTLET STATUS REPORTER THREAD",
+            DEVICE_ID
+        )
+
+    def report_loop(self):
+
+        while self._running:
+
+            try:
+
+                for outlet in range(1, 9):
+
+                    status = pdu.get_status(outlet=outlet)
+
+                    msg = f"set pdu_outlet_{outlet:d} {status}"
+
+                    self.client.sendto(
+                        msg.encode("utf-8"),
+                        (self.host, self.port)
+                    )
+
+                    logger.info(
+                        "%s: sent '%s'",
+                        DEVICE_ID,
+                        msg
+                    )
+
+            except Exception:
+                logger.exception(
+                    "%s: outlet status reporting failed",
+                    DEVICE_ID
+                )
+
+            time.sleep(self.interval)
+
+# =========================================================
+# MAIN
+# =========================================================
+
 if __name__ == "__main__":
 
-    pdu = pdu41001.PDU41001(
-        host=PDU41001_IP_ADDRESS,
-        user=PDU41001_USER,
-        password=PDU41001_PASSWORD
+    # =====================================================
+    # CONNECT DEVICE THROUGH DRIVER
+    # =====================================================
+
+    pdu = pdu41001.PDU41001(host=PDU41001_IP_ADDRESS, user=PDU41001_USER, password=PDU41001_PASSWORD)
+    pdu.connect()
+
+    logger.info(
+        "%s: device connected",
+        DEVICE_ID
     )
 
-    pdu.connect()
-    logger.info("%s: SSH connection established", DEVICE_ID)
+    # =====================================================
+    # START DEVICE SOCKET SERVER THREAD
+    # =====================================================
 
-    with socketserver.UDPServer((HOST, PORT), MyUDPHandler) as server:
+    device_socket_server = UDPServerThread(host=DEVICE_SERVER_HOST, port=DEVICE_SERVER_PORT)
+    device_socket_server.start()
+
+    # =====================================================
+    # START POLLING FROM SCHEDULER SERVER THREAD
+    # =====================================================
+
+    scheduler_poller = SchedulerPoller(host=TEST_SCHEDULER_SERVER_HOST, port=TEST_SCHEDULER_SERVER_PORT)
+    scheduler_poller.start_polling_scheduler_server()
+
+    # =====================================================
+    # START OUTLET STATUS REPORTER THREAD
+    # =====================================================
+
+    status_reporter = OutletStatusReporter(host=TEST_STATUS_SERVER_HOST, port=TEST_STATUS_SERVER_PORT, interval=10)
+    status_reporter.start()
+    
+    while True:
         try:
-            logger.info("%s: START SOCKET SERVER", DEVICE_ID)
-            server.serve_forever()
-
+            time.sleep(1)
         except KeyboardInterrupt:
-            logger.info("%s: STOP SOCKET SERVER", DEVICE_ID)
-
-        finally:
+            device_socket_server.stop()
+            scheduler_poller.stop_polling_scheduler_server()
+            status_reporter.stop()
             pdu.close()
-            logger.info("%s: STOP SSH CONNECTION", DEVICE_ID)
+            del pdu
+            break
