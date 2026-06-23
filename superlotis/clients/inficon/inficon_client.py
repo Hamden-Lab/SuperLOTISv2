@@ -165,31 +165,30 @@ def process_command(command: str, server) -> bytes:
 
 
 def stream_measurements(gauges: Dict[str, PxG55xRS485], target_host: str, target_port: int, interval: float) -> None:
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        logger.info("Starting pressure stream to %s:%s every %.1f seconds", target_host, target_port, interval)
-        while True:
-            if not gauges:
-                logger.warning("No gauges to stream. Waiting before retrying.")
-                time.sleep(interval)
-                continue
+    while True:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.connect((target_host, target_port))
+                logger.info("Starting pressure stream to %s:%s every %.1f seconds over TCP", target_host, target_port, interval)
 
-            timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            lines = []
-            for label, gauge in gauges.items():
-                try:
-                    pressure = gauge.get_pressure_real()
-                    lines.append(f"{timestamp} {label} pressure {pressure:.6g}")
-                except Exception:
-                    logger.exception("Failed to read pressure from %s", label)
-                    lines.append(f"{timestamp} {label} pressure ERROR")
+                while True:
+                    if not gauges:
+                        logger.warning("No gauges to stream. Waiting before retrying.")
+                        time.sleep(interval)
+                        continue
 
-            payload = "\n".join(lines).encode("utf-8")
-            try:
-                sock.sendto(payload, (target_host, target_port))
-                logger.info("Sent %d bytes to %s:%s", len(payload), target_host, target_port)
-            except Exception:
-                logger.exception("Failed to send pressure stream to %s:%s", target_host, target_port)
+                    for label, gauge in gauges.items():
+                        try:
+                            pressure = gauge.get_pressure_real()
+                            payload = f"set {label}_pressure {pressure:.6g}".encode("utf-8")
+                            sock.sendall(payload)
+                        except Exception:
+                            logger.exception("Failed to read pressure from %s", label)
+                            continue
 
+                    time.sleep(interval)
+        except Exception:
+            logger.exception("TCP pressure stream connection failed to %s:%s", target_host, target_port)
             time.sleep(interval)
 
 
@@ -216,11 +215,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Inficon client with optional UDP server and streaming mode.")
     parser.add_argument("--server-host", default=UDP_HOST, help="Local UDP server host to listen on.")
     parser.add_argument("--server-port", type=int, default=UDP_PORT, help="Local UDP server port to listen on.")
-    parser.add_argument("--stream-host", default=SLOTIS_STATUS_SERVER_IP_ADDRESS, help="Remote UDP server host to stream pressure measurements to.")
+    parser.add_argument("--stream-host", default="localhost", help="Remote UDP server host to stream pressure measurements to.")
     parser.add_argument("--stream-port", type=int, default=SLOTIS_STATUS_SERVER_PORT, help="Remote UDP server port to stream pressure measurements to.")
     parser.add_argument("--interval", type=float, default=1.0, help="Pressure measurement interval in seconds.")
     return parser.parse_args()
 
+#SLOTIS_STATUS_SERVER_IP_ADDRESS
 
 def main() -> None:
     args = parse_args()

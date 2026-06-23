@@ -1,13 +1,12 @@
 from superlotis.drivers.sophia.sophia import SOPHIA
-from tools.constants import SOPHIA_FRAME_TIMEOUT, SOPHIA_IP_ADDRESS, SOPHIA_PORT
-
+from tools.constants import SLOTIS_SCHEDULER_IP_ADDRESS, SLOTIS_SCHEDULER_PORT
 import sys
 import socket
 import selectors
 import types
 
-HOST = SOPHIA_IP_ADDRESS
-PORT = SOPHIA_PORT  # Port to listen on (non-privileged ports are > 1023)
+HOST = SLOTIS_SCHEDULER_IP_ADDRESS
+PORT = SLOTIS_SCHEDULER_PORT  # Port to listen on (non-privileged ports are > 1023)
 
 
 def accept_wrapper(sock):
