@@ -6,6 +6,11 @@ import threading
 import time
 import logging
 from pathlib import Path
+from dataclasses import dataclass
+from typing import Optional
+import re
+import datetime
+import calendar
 
 # =========================================================
 # CONFIG
@@ -13,6 +18,8 @@ from pathlib import Path
 
 # Identification string of the device for logging
 DEVICE_ID = "PDU41001"
+DEVICE_SYSTEM = "SLOTIS"
+DEVICE_SUBSYSTEM = "PDU"
 
 # Device socket server
 DEVICE_SERVER_HOST = PDU41001_SOCKET_IP_ADDRESS
@@ -34,6 +41,222 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+@dataclass
+class ParsedCommand:
+    raw_line: str
+    execute_at: float
+    system: str
+    subsystem: str
+    command: str
+
+
+# Matches:
+# now 0 SLOTIS PDU poweroff 2
+NOW_REGEX = re.compile(
+    r"""
+    ^now
+    \s+
+    (?P<offset>-?\d+)
+    \s+
+    (?P<system>\S+)
+    \s+
+    (?P<subsystem>\S+)
+    \s+
+    (?P<command>.+)
+    $
+    """,
+    re.VERBOSE,
+)
+
+
+# Matches:
+# 0 31 19 18 05 2023 -20 SLOTIS PDU poweroff 2
+DATE_REGEX = re.compile(
+    r"""
+    ^
+    (?P<sec>\d+)
+    \s+
+    (?P<minute>\d+)
+    \s+
+    (?P<hour>\d+)
+    \s+
+    (?P<day>\d+)
+    \s+
+    (?P<month>\d+)
+    \s+
+    (?P<year>\d+)
+    \s+
+    (?P<offset>-?\d+)
+    \s+
+    (?P<system>\S+)
+    \s+
+    (?P<subsystem>\S+)
+    \s+
+    (?P<command>.+)
+    $
+    """,
+    re.VERBOSE,
+)
+
+
+
+
+
+def parse_schedule_line(line: str) -> Optional[ParsedCommand]:
+
+    line = line.strip()
+
+    if not line or line.startswith("#"):
+        return None
+
+    # =====================================================
+    # NOW FORMAT
+    # =====================================================
+
+    match = NOW_REGEX.match(line)
+
+    if match:
+
+        system = match.group("system")
+        subsystem = match.group("subsystem")
+
+        if (
+            system != DEVICE_SYSTEM
+            or subsystem != DEVICE_SUBSYSTEM
+        ):
+            return None
+
+        offset = int(match.group("offset"))
+
+        execute_at = time.time() + offset
+
+        return ParsedCommand(
+            raw_line=line,
+            execute_at=execute_at,
+            system=system,
+            subsystem=subsystem,
+            command=match.group("command"),
+        )
+
+    # =====================================================
+    # ABSOLUTE DATETIME FORMAT
+    # =====================================================
+
+    match = DATE_REGEX.match(line)
+
+    if match:
+
+        system = match.group("system")
+        subsystem = match.group("subsystem")
+
+        if (
+            system != DEVICE_SYSTEM
+            or subsystem != DEVICE_SUBSYSTEM
+        ):
+            return None
+
+        sec = int(match.group("sec"))
+        minute = int(match.group("minute"))
+        hour = int(match.group("hour"))
+        day = int(match.group("day"))
+        month = int(match.group("month"))
+        year = int(match.group("year"))
+
+        offset = int(match.group("offset"))
+
+        dt = datetime.datetime(
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            sec,
+        )
+
+        execute_at = calendar.timegm(dt.timetuple()) + offset
+
+        return ParsedCommand(
+            raw_line=line,
+            execute_at=execute_at,
+            system=system,
+            subsystem=subsystem,
+            command=match.group("command"),
+        )
+
+    return None
+
+
+class CommandScheduler:
+
+    def __init__(self):
+
+        self.scheduled = set()
+
+        self.lock = threading.Lock()
+
+    def schedule(self, parsed: ParsedCommand):
+
+        with self.lock:
+
+            # avoid duplicate scheduling
+            if parsed.raw_line in self.scheduled:
+                return
+
+            self.scheduled.add(parsed.raw_line)
+
+        thread = threading.Thread(
+            target=self._execute_later,
+            args=(parsed,),
+            daemon=True
+        )
+
+        thread.start()
+
+    def _execute_later(self, parsed: ParsedCommand):
+
+        try:
+
+            now = time.time()
+
+            delay = parsed.execute_at - now
+
+            logger.info(
+                "%s: command '%s' scheduled in %.2f sec",
+                DEVICE_ID,
+                parsed.command,
+                delay
+            )
+
+            # already expired
+            if delay < -5:
+
+                logger.warning(
+                    "%s: skipping expired command '%s'",
+                    DEVICE_ID,
+                    parsed.command
+                )
+
+                return
+
+            # wait until execution time
+            if delay > 0:
+                time.sleep(delay)
+
+            logger.info(
+                "%s: executing scheduled command '%s'",
+                DEVICE_ID,
+                parsed.command
+            )
+
+            process_command(parsed.command)
+
+        except Exception:
+
+            logger.exception(
+                "%s: scheduled execution failed",
+                DEVICE_ID
+            )
 
 # =========================================================
 # PDU COMMAND PROCESSING
@@ -247,11 +470,20 @@ class UDPServerThread:
 
 class SchedulerPoller(object):
 
-    def __init__(self, host, port, timeout=5, poll_interval=SLOTIS_SCHEDULER_POLL_INTERVAL):
+    def __init__(
+    self,
+    host,
+    port,
+    scheduler,
+    timeout=5,
+    poll_interval=SLOTIS_SCHEDULER_POLL_INTERVAL
+):
+
         logger.info(
             "%s: starting master polling thread",
             DEVICE_ID
         )
+        self.scheduler = scheduler
         self.host = host
         self.port = port
         self.client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -301,30 +533,18 @@ class SchedulerPoller(object):
 
                 for line in lines:
 
-                    line = line.strip()
+                    parsed = parse_schedule_line(line)
 
-                    if not line:
+                    if parsed is None:
                         continue
 
                     logger.info(
-                        "%s: parsing line '%s'",
+                        "%s: accepted command '%s'",
                         DEVICE_ID,
-                        line
+                        parsed.command
                     )
 
-                    # Example:
-                    # now 0 SLOTIS PDU poweroff 2
-
-                    parts = line.split()
-
-                    if len(parts) < 5:
-                        continue
-
-                    # extract actual command
-                    # poweroff 2
-                    cmd = " ".join(parts[4:])
-
-                    process_command(cmd)
+                    self.scheduler.schedule(parsed)
 
             except Exception:
                 logger.exception(
@@ -429,7 +649,13 @@ if __name__ == "__main__":
     # START POLLING FROM SCHEDULER SERVER THREAD
     # =====================================================
 
-    scheduler_poller = SchedulerPoller(host=TEST_SCHEDULER_SERVER_HOST, port=TEST_SCHEDULER_SERVER_PORT)
+    # scheduler_poller = SchedulerPoller(host=TEST_SCHEDULER_SERVER_HOST, port=TEST_SCHEDULER_SERVER_PORT)
+    # scheduler_poller.start_polling_scheduler_server()
+
+    scheduler = CommandScheduler()
+
+
+    scheduler_poller = SchedulerPoller(host=TEST_SCHEDULER_SERVER_HOST, port=TEST_SCHEDULER_SERVER_PORT, scheduler=scheduler)
     scheduler_poller.start_polling_scheduler_server()
 
     # =====================================================
@@ -438,7 +664,8 @@ if __name__ == "__main__":
 
     status_reporter = OutletStatusReporter(host=TEST_STATUS_SERVER_HOST, port=TEST_STATUS_SERVER_PORT, interval=10)
     status_reporter.start()
-    
+
+
     while True:
         try:
             time.sleep(1)
