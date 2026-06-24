@@ -262,6 +262,8 @@ def main() -> None:
 
     schedule_event_times: List[datetime.datetime] = []
     next_schedule_event: Optional[datetime.datetime] = None
+    period_start_time: Optional[datetime.datetime] = None
+    period_end_time: Optional[datetime.datetime] = None
     last_schedule_poll = 0.0
     sequence_started = False
     pdu_powered = False
@@ -270,7 +272,7 @@ def main() -> None:
     shutting_down = False
 
     def maybe_refresh_schedule() -> None:
-        nonlocal schedule_event_times, next_schedule_event, last_schedule_poll
+        nonlocal schedule_event_times, next_schedule_event, period_start_time, period_end_time, last_schedule_poll
         now_ts = time.time()
         if now_ts - last_schedule_poll < args.schedule_poll_interval:
             return
@@ -280,19 +282,38 @@ def main() -> None:
             return
         schedule_event_times = list(parse_scheduler_lines(schedule_text))
         next_schedule_event = get_next_schedule_event(schedule_event_times)
+        if schedule_event_times and len(schedule_event_times) >= 2:
+            period_start_time = schedule_event_times[0]
+            period_end_time = schedule_event_times[-1]
+        else:
+            period_start_time = None
+            period_end_time = None
         logger.info(
             "Scheduler poll: %d events, next event in %s",
             len(schedule_event_times),
             f"{(next_schedule_event - datetime.datetime.now()).total_seconds():.1f}s" if next_schedule_event else "none",
         )
 
-    def should_be_outside_period() -> bool:
-        if not schedule_event_times:
-            return True
+    def is_inside_period() -> bool:
+        if not schedule_event_times or len(schedule_event_times) < 2:
+            return False
         now = datetime.datetime.now()
-        if len(schedule_event_times) < 2:
-            return now < schedule_event_times[0]
-        return now < schedule_event_times[0] or now > schedule_event_times[-1]
+        return schedule_event_times[0] <= now <= schedule_event_times[-1]
+
+    def time_since_period_start() -> Optional[float]:
+        if not period_start_time:
+            return None
+        return (datetime.datetime.now() - period_start_time).total_seconds()
+
+    def time_until_period_start() -> Optional[float]:
+        if not period_start_time:
+            return None
+        return (period_start_time - datetime.datetime.now()).total_seconds()
+
+    def time_since_period_end() -> Optional[float]:
+        if not period_end_time:
+            return None
+        return (datetime.datetime.now() - period_end_time).total_seconds()
 
     try:
         while True:
@@ -302,15 +323,13 @@ def main() -> None:
             if pressure is not None:
                 logger.info("Polled %s pressure = %s", args.inficon_gauge, pressure)
 
-            now = datetime.datetime.now()
-            if next_schedule_event:
-                time_to_next = (next_schedule_event - now).total_seconds()
-            else:
-                time_to_next = float("inf")
+            inside_period = is_inside_period()
+            time_to_start = time_until_period_start()
+            time_since_end = time_since_period_end()
 
-            outside_period = should_be_outside_period()
+            lead_seconds = args.shutdown_lead_minutes * 60
 
-            if not shutting_down and outside_period and time_to_next > args.shutdown_lead_minutes * 60:
+            if not shutting_down and not sequence_started and time_to_start is not None and 0 <= time_to_start <= lead_seconds:
                 if not mvp_started:
                     start_mvp(mvp)
                     mvp_started = True
@@ -323,14 +342,15 @@ def main() -> None:
                 if mvp_started or turbo_started or pdu_powered:
                     sequence_started = True
 
-            if sequence_started and time_to_next <= args.shutdown_lead_minutes * 60:
-                shutting_down = True
-                shutdown_sequence(pdu, args.pdu_outlet, turbo, mvp)
-                pdu_powered = False
-                turbo_started = False
-                mvp_started = False
-                sequence_started = False
-                shutting_down = False
+            if not inside_period and time_since_end is not None and time_since_end >= lead_seconds:
+                if sequence_started and not shutting_down:
+                    shutting_down = True
+                    shutdown_sequence(pdu, args.pdu_outlet, turbo, mvp)
+                    pdu_powered = False
+                    turbo_started = False
+                    mvp_started = False
+                    sequence_started = False
+                    shutting_down = False
 
             time.sleep(args.pressure_poll_interval)
     except KeyboardInterrupt:
