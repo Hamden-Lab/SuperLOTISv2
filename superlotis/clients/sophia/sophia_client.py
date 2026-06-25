@@ -1,11 +1,21 @@
 import datetime
 import logging
+import socket
 import socketserver
 import threading
+import time
 from typing import List
 
 from superlotis.drivers.sophia.sophia import SOPHIA
-from superlotis.tools.constants import SLOTIS_SCHEDULER_IP_ADDRESS, SLOTIS_SCHEDULER_PORT
+from superlotis.tools.constants import (
+    SLOTIS_SCHEDULER_IP_ADDRESS,
+    SLOTIS_SCHEDULER_PORT,
+    SLOTIS_STATUS_SERVER_IP_ADDRESS,
+    SLOTIS_STATUS_SERVER_PORT,
+    PDU41001_SOCKET_IP_ADDRESS,
+    PDU41001_SOCKET_PORT,
+    SOPHIA_OUTLET,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -160,12 +170,153 @@ class SophiaUDPServer(socketserver.ThreadingUDPServer):
         self.camera = camera
 
 
+def _counter_loop(counter: dict, lock: threading.Lock, stop_event: threading.Event) -> None:
+    while not stop_event.is_set():
+        with lock:
+            counter["value"] += 1
+        stop_event.wait(1.0)
+
+
+def _query_pdu_outlet_status(outlet: int, timeout: float = 1.0) -> str:
+    """Query the local PDU client via UDP for outlet status. Returns 'on'/'off' or 'unknown'."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.settimeout(timeout)
+            cmd = f"get status {outlet}".encode("utf-8")
+            s.sendto(cmd, (PDU41001_SOCKET_IP_ADDRESS, PDU41001_SOCKET_PORT))
+            data, _ = s.recvfrom(1024)
+            resp = data.decode("utf-8", errors="replace").strip()
+            # expected: 'outlet {n} status {state}'
+            parts = resp.split()
+            if len(parts) >= 4 and parts[-2] == "status":
+                return parts[-1]
+            # fallback: return last token
+            if parts:
+                return parts[-1]
+    except Exception:
+        logger.exception("Failed to query PDU outlet status")
+    return "unknown"
+
+
+def tcp_status_stream(camera: SOPHIA, status_host: str, status_port: int, counter: dict, lock: threading.Lock, stop_event: threading.Event, interval: float = 1.0) -> None:
+    """Send camera status lines over TCP every `interval` seconds to the status server.
+
+    Lines sent:
+      set sophia_camera_status {on/off}
+      set SOPHIA_ccdtemp {T}
+      set SOPHIA_exposure {t}
+      set sophia_exposing {yes/no}
+      set sophia_count {x}
+    """
+    logger.info("Starting Sophia TCP status stream to %s:%s every %.1f seconds", status_host, status_port, interval)
+    sock = None
+    while not stop_event.is_set():
+        try:
+            if sock is None:
+                sock = socket.create_connection((status_host, status_port), timeout=5)
+
+            # camera power via PDU
+            pdu_state = _query_pdu_outlet_status(SOPHIA_OUTLET)
+            camera_power = pdu_state if pdu_state in ("on", "off") else ("on" if pdu_state.lower().startswith("on") else "off")
+
+            # camera metrics
+            try:
+                temp = camera.get_temperature()
+            except Exception:
+                logger.exception("Failed to read camera temperature")
+                temp = None
+
+            try:
+                exptime = camera.get_exptime()
+            except Exception:
+                logger.exception("Failed to read exposure time")
+                exptime = None
+
+            try:
+                status = camera.get_status()
+            except Exception:
+                logger.exception("Failed to read camera status")
+                status = None
+
+            exposing = "no"
+            if status is not None:
+                s = str(status).lower()
+                if s and ("expos" in s or "running" in s or "busy" in s):
+                    exposing = "yes"
+
+            with lock:
+                count = counter.get("value", 0)
+
+            lines = []
+            lines.append(f"set sophia_camera_status {camera_power}")
+            if temp is not None:
+                try:
+                    lines.append(f"set SOPHIA_ccdtemp {float(temp):.1f}")
+                except Exception:
+                    lines.append(f"set SOPHIA_ccdtemp {temp}")
+            else:
+                lines.append("set SOPHIA_ccdtemp unknown")
+
+            lines.append(f"set SOPHIA_exposure {exptime}")
+            lines.append(f"set sophia_exposing {exposing}")
+            lines.append(f"set sophia_count {count}")
+
+            payload = "\n".join(lines).encode("utf-8") + b"\n"
+
+            try:
+                sock.sendall(payload)
+                logger.debug("Sent Sophia TCP status to %s:%s", status_host, status_port)
+            except Exception:
+                logger.exception("Failed to send Sophia status over TCP, will reconnect")
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+                sock = None
+
+        except Exception:
+            logger.exception("TCP connection error for Sophia status stream")
+            if sock:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+            sock = None
+
+        stop_event.wait(interval)
+
+    if sock:
+        try:
+            sock.close()
+        except Exception:
+            pass
+
+
 if __name__ == "__main__":
     camera = SOPHIA()
     logger.info("Initialized SOPHIA camera")
+
+    stop_event = threading.Event()
+    counter = {"value": 0}
+    counter_lock = threading.Lock()
+
+    counter_thread = threading.Thread(target=_counter_loop, args=(counter, counter_lock, stop_event), daemon=True)
+    counter_thread.start()
+
+    tcp_thread = threading.Thread(
+        target=tcp_status_stream,
+        args=(camera, SLOTIS_STATUS_SERVER_IP_ADDRESS, SLOTIS_STATUS_SERVER_PORT, counter, counter_lock, stop_event, 1.0),
+        daemon=True,
+    )
+    tcp_thread.start()
+
     with SophiaUDPServer((HOST, PORT), SophiaUDPHandler, camera) as server:
         logger.info("Listening for scheduler commands on %s:%s", HOST, PORT)
         try:
             server.serve_forever()
         except KeyboardInterrupt:
             logger.info("Stopping Sophia scheduler listener")
+        finally:
+            stop_event.set()
+            counter_thread.join(timeout=2.0)
+            tcp_thread.join(timeout=2.0)
