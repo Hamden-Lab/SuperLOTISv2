@@ -15,18 +15,38 @@ Repo containing code for SuperLOTIS upgrade (SOPHIA camera, Pfeiffer Vacuum Pump
 * typing-extensions
 * keyring
 
+## Create the conda environment from file
+```
+conda env create -f environment.yml
+```
+If new packages have been installed, export again the current env configuration to file:
+```
+conda export > environment.yml
+```
+
+## Activate the conda environment
+```
+conda activate superlotis
+```
+
 ## Reinstall the package
+```
 pip install -e .
+```
 
 ## TODO
-- [] write a function for device client that is interpreting a line of the scheduler (see scheduler_loader.pl script)
+- [] write a sample scheduler script to test with our local devices (pdu + pump...)
 - [] testing the camera chiller driver
 - [] manage the timing of the scheduler lines now, now + 30, etc.
 - [] why apache2 server installation has root access required to edit php pages ?
 - [] remember to include outlet address for all items on PDU to constants.py
 - [] write a windows bat file script that create a bunch of CMD terminals for each device driver + client with colours and paths
+<<<<<<< HEAD
+- [X] write a function for device client that is interpreting a line of the scheduler (see scheduler_loader.pl script)
+=======
 - [] get attribute names for SOPHIA
 - [] implement shutter/dark taking for SOPHIA.py
+>>>>>>> f59ded82882385961add3031811373bd9421e880
 - [X] set up NTP time server for PDU in order to have correct timing for logs
 - [X] timeout of pdu is only 10 minutes max before logging off (see page 63 timeout). KS extend it to 10 minutes from the default 3 minutes.
 - [X] send attributes update to slotis status server
