@@ -198,6 +198,49 @@ def status_stream(chiller: TCubeChiller, status_host: str, status_port: int, int
             stop_event.wait(interval)
 
 
+def tcp_temperature_stream(chiller: TCubeChiller, status_host: str, status_port: int, interval: float, stop_event: threading.Event) -> None:
+    """Send the current chiller temperature to the status server over TCP every `interval` seconds.
+
+    The message format is: "set chiller_temp {T}" (single line). The function will attempt
+    to reconnect on failure and stop when `stop_event` is set.
+    """
+    logger.info("Starting chiller TCP temperature stream to %s:%s every %.1f seconds", status_host, status_port, interval)
+    sock = None
+    while not stop_event.is_set():
+        try:
+            if sock is None:
+                sock = socket.create_connection((status_host, status_port), timeout=5)
+            temperature = chiller.get_temperature()
+            payload = f"set chiller_temp {temperature:.1f}".encode("utf-8")
+            try:
+                sock.sendall(payload + b"\n")
+                logger.debug("Sent chiller TCP temperature to %s:%s", status_host, status_port)
+            except Exception:
+                # Reset socket to attempt reconnect on next loop
+                logger.exception("Failed to send over TCP, will reconnect")
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+                sock = None
+        except Exception:
+            logger.exception("TCP connection error for chiller temperature stream")
+            if sock:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+            sock = None
+
+        stop_event.wait(interval)
+
+    if sock:
+        try:
+            sock.close()
+        except Exception:
+            pass
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Chiller client with scheduler listener and status updates.")
     parser.add_argument("--serial-port", required=True, help="Serial port for the chiller device.")
@@ -233,6 +276,13 @@ def main() -> None:
     )
     status_thread.start()
 
+    tcp_thread = threading.Thread(
+        target=tcp_temperature_stream,
+        args=(chiller, args.status_host, args.status_port, 10.0, stop_event),
+        daemon=True,
+    )
+    tcp_thread.start()
+
     with ChillerUDPServer((args.scheduler_host, args.scheduler_port), ChillerUDPHandler, chiller) as server:
         logger.info("Listening for scheduler commands on %s:%s", args.scheduler_host, args.scheduler_port)
         try:
@@ -242,6 +292,7 @@ def main() -> None:
         finally:
             stop_event.set()
             status_thread.join(timeout=args.interval + 1.0)
+            tcp_thread.join(timeout=11.0)
             try:
                 chiller.stop()
                 logger.info("Chiller stopped")
