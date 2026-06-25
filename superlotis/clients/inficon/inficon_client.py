@@ -182,6 +182,7 @@ def stream_measurements(gauges: Dict[str, PxG55xRS485], target_host: str, target
                             pressure = gauge.get_pressure_real()
                             payload = f"set {label}_pressure {pressure:.6g}".encode("utf-8")
                             sock.sendall(payload)
+                            time.sleep(0.1)  # Small delay to avoid overwhelming the server
                         except Exception:
                             logger.exception("Failed to read pressure from %s", label)
                             continue

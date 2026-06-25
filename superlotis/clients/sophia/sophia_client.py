@@ -261,10 +261,10 @@ def tcp_status_stream(camera: SOPHIA, status_host: str, status_port: int, counte
             lines.append(f"set sophia_exposing {exposing}")
             lines.append(f"set sophia_count {count}")
 
-            payload = "\n".join(lines).encode("utf-8") + b"\n"
-
             try:
-                sock.sendall(payload)
+                for line in lines:
+                    sock.sendall(line.encode("utf-8") + b"\n")
+                    time.sleep(0.1)  # Small delay to avoid overwhelming the server
                 logger.debug("Sent Sophia TCP status to %s:%s", status_host, status_port)
             except Exception:
                 logger.exception("Failed to send Sophia status over TCP, will reconnect")
