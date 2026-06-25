@@ -12,6 +12,9 @@ class SOPHIA(object):
         data = self.cam.grab(nframes=1, frame_timeout=SOPHIA_FRAME_TIMEOUT)
         return data
     
+    #def take_dark(self):
+
+
     def take_bias(self):
         temp_exptime = self.cam.get_attribute_value("Exposure Time")
 
@@ -36,6 +39,9 @@ class SOPHIA(object):
     def get_all_attributes(self):
         # Get all attribute values of the camera (dict that can be stored as FITS headers)
         return self.cam.get_all_attribute_values()
+    
+    def get_status(self):
+        return self.cam.get_attribute_value("Exposure Status")
 
 if __name__ == "__main__":
     sophia = SOPHIA()
