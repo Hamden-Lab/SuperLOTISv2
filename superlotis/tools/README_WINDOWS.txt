@@ -1,6 +1,5 @@
 Required softwares:
 ===================
-
 Through Microsoft Store:
 - Miniconda
 - Visual Studio Code
@@ -10,11 +9,8 @@ Through Microsoft Store:
 - GitHub Desktop
 - Anydesk
 
-superlotis computer: 192.168.1.1
-
 PDU configuration:
 ==================
-
 username = superlotis
 password = lotis@553LAB
 DHCP = off
@@ -26,8 +22,18 @@ Create conda environment:
 =========================
 conda create -n superlotis python=3.14
 
-
-lyman computer credentials:
+superlotis computer credentials:
 ===========================
 ssh slotis@slotis.kpno.noirlab.edu
 AzTEC!SNe
+
+superlotis admin credientials:
+==============================
+ssh sladm@slotis.kpno.noirlab.edu
+SNe$AzTEC!
+
+Network configuration:
+======================
+lyman       192.168.1.1
+pfeiffer    192.168.1.100
+pdu41001    192.168.1.101
