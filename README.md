@@ -25,6 +25,8 @@ pip install -e .
 - [] why apache2 server installation has root access required to edit php pages ?
 - [] remember to include outlet address for all items on PDU to constants.py
 - [] write a windows bat file script that create a bunch of CMD terminals for each device driver + client with colours and paths
+- [] get attribute names for SOPHIA
+- [] implement shutter/dark taking for SOPHIA.py
 - [X] set up NTP time server for PDU in order to have correct timing for logs
 - [X] timeout of pdu is only 10 minutes max before logging off (see page 63 timeout). KS extend it to 10 minutes from the default 3 minutes.
 - [X] send attributes update to slotis status server
