@@ -1,5 +1,5 @@
 from superlotis.drivers.pdu41001 import pdu41001
-from superlotis.tools.constants import PDU41001_IP_ADDRESS, PDU41001_USER, PDU41001_PASSWORD, PDU41001_SOCKET_IP_ADDRESS, PDU41001_SOCKET_PORT, PDU41001_NUMBER_OUTLETS, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL
+from superlotis.tools.constants import PDU41001_IP_ADDRESS, PDU41001_USER, PDU41001_PASSWORD, PDU41001_SOCKET_IP_ADDRESS, PDU41001_SOCKET_PORT, PDU41001_NUMBER_OUTLETS, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL
 from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, UDPServerThread
 import time
 import logging
@@ -21,7 +21,7 @@ DEVICE_SERVER_PORT = PDU41001_SOCKET_PORT
 # LOGGING
 # =========================================================
 
-LOG_FILE = Path("pdu41001_client.log")
+LOG_FILE = Path(f"{DEVICE_ID}_client.log")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,7 +33,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
 
 # =========================================================
 # PDU COMMAND PROCESSING
@@ -255,7 +254,7 @@ if __name__ == "__main__":
     # START OUTLET STATUS REPORTER THREAD
     # =====================================================
 
-    status_reporter = OutletStatusReporter(host=TEST_STATUS_SERVER_HOST, port=TEST_STATUS_SERVER_PORT, logger=logger, device_id=DEVICE_ID, interval=10)
+    status_reporter = OutletStatusReporter(host=TEST_STATUS_SERVER_HOST, port=TEST_STATUS_SERVER_PORT, logger=logger, device_id=DEVICE_ID, interval=SLOTIS_STATUS_POLL_INTERVAL)
     status_reporter.start()
 
     # =====================================================
