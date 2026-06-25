@@ -1,0 +1,6 @@
+#Test scheduler for SOPHIA upgrade
+now 0 LYMAN PDU poweroff 2
+now 5 LYMAN PDU get status 2
+now 10 LYMAN PDU poweron 2
+now 15 LYMAN PUMP 
+now 20 LYMAN 

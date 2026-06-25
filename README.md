@@ -38,7 +38,7 @@ pip install -e .
 - [] write a sample scheduler script to test with our local devices (pdu + pump...)
 - [] testing the camera chiller driver
 - [] manage the timing of the scheduler lines now, now + 30, etc.
-- [] why apache2 server installation has root access required to edit php pages ?
+- [X] why apache2 server installation has root access required to edit php pages ? fixed wit sladm user
 - [] remember to include outlet address for all items on PDU to constants.py
 - [] write a windows bat file script that create a bunch of CMD terminals for each device driver + client with colours and paths
 - [] get attribute names for SOPHIA
@@ -55,32 +55,33 @@ pip install -e .
 - `slotis_scheduler.pl` : hosting all the commands that need to be executed during the observation night.
 - `device_client.pl/py` : sending status information to the slotis_status_server + interpreting and transfering commands read from the slotis_scheduler (smart way = identifying FLAG + managing the execution time by comparing it with now to what is contained in the scheduler line) host server to the actual device through serial or ethernet.
 
+## Scheduler script sample
 
+```perl
+# Specify the exact local time of execution
+# as: second minute hour day_of_month month year offset_in_seconds,
+# then include the command.
+# e.g., "12 10 18 13 11 2004 0 SLOTIS TCS NEXTRA +183210.0" would be executed at Sat Nov 13 18:10:12 2004
+# while "12 10 18 13 11 2004 21 SLOTIS TCS NEXTRA +183210.0" would be executed at Sat Nov 13 18:10:43 2004
 
-    # Specify the exact local time of execution
-    # as: second minute hour day_of_month month year offset_in_seconds,
-    # then include the command.
-    # e.g., "12 10 18 13 11 2004 0 SLOTIS TCS NEXTRA +183210.0" would be executed at Sat Nov 13 18:10:12 2004
-    # while "12 10 18 13 11 2004 21 SLOTIS TCS NEXTRA +183210.0" would be executed at Sat Nov 13 18:10:43 2004
-
-    # A negative offset is also possible.
-    # e.g.,  "12 10 18 13 11 2004 -3 SLOTIS TCS NEXTRA +183210.0" would be executed at Sat Nov 13 18:10:09 2004
+# A negative offset is also possible.
+# e.g.,  "12 10 18 13 11 2004 -3 SLOTIS TCS NEXTRA +183210.0" would be executed at Sat Nov 13 18:10:09 2004
 } elsif ( $line =~ /(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*([\-|\s])(\d+)\s+(.+)/ ) {
-    $sec = $1;
-    $min = $2;
-    $hour = $3;
-    $mday = $4;               # Day of the month
-    $mon = $5 - 1;            # Months from Time::Local are 0 to 11, this changes the range from 1 to 12 to 0 to 11.
-    $year = $6;
-    $sign = $7;
-    $offset_secs = $8;
-    $cmd = $9;
-    $offset_secs = 0 - $offset_secs if $sign =~ /\-/;
+$sec = $1;
+$min = $2;
+$hour = $3;
+$mday = $4;               # Day of the month
+$mon = $5 - 1;            # Months from Time::Local are 0 to 11, this changes the range from 1 to 12 to 0 to 11.
+$year = $6;
+$sign = $7;
+$offset_secs = $8;
+$cmd = $9;
+$offset_secs = 0 - $offset_secs if $sign =~ /\-/;
 
-    $unix_timestamp = timelocal($sec, $min, $hour, $mday, $mon, $year) + $offset_secs;
+$unix_timestamp = timelocal($sec, $min, $hour, $mday, $mon, $year) + $offset_secs;
+```
 
-
-
+```bash
 #Observing schedule for 230518
 now -1 SLOTIS SICAM cooler on
 now 0 SLOTIS TCS 4 MOVSTOW
@@ -113,5 +114,4 @@ now 1 SLOTIS TCS 4 DISEPOCH 2000.0
 0 31 19 18 05 2023 334 SLOTIS SICAM object Flat_V
 0 31 19 18 05 2023 374 SLOTIS SICAM setexp 3000
 0 31 19 18 05 2023 377 SLOTIS SICAM expose
-
-https://chatgpt.com/s/t_6a3b230cac24819188106d7c28c1dadd
+```
