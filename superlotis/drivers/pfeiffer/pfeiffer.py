@@ -14,10 +14,12 @@ backing = Pump(controller, "MVP", 2)
 
 # print(PUMP_PARAMETERS["MVP"]["pumping_power"])
 
-backing.pumping_power = True
-
-time.sleep(15)
-
 backing.pumping_power = False
+
+print(turbo.heating)
+
+# time.sleep(15)
+
+# backing.pumping_power = False
 
 controller.client.disconnect()
