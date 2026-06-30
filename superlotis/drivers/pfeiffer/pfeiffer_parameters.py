@@ -42,6 +42,12 @@ COMMON_PARAMETERS = {
         writable=True,
         default=False,
     ),
+
+    "error_code": Parameter(
+        node_id="_303_Error code",
+        dtype=str,
+        default=None,
+    ),
 }
 
 TC80_PARAMETERS = {
