@@ -48,6 +48,11 @@ COMMON_PARAMETERS = {
         dtype=str,
         default=None,
     ),
+
+    "actual_speed": Parameter(
+        node_id="_309_ActualSpd",
+        dtype=int
+    )
 }
 
 TC80_PARAMETERS = {
