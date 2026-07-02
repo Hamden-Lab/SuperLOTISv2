@@ -42,6 +42,17 @@ COMMON_PARAMETERS = {
         writable=True,
         default=False,
     ),
+
+    "error_code": Parameter(
+        node_id="_303_Error code",
+        dtype=str,
+        default=None,
+    ),
+
+    "actual_speed": Parameter(
+        node_id="_309_ActualSpd",
+        dtype=int
+    )
 }
 
 TC80_PARAMETERS = {
@@ -82,10 +93,30 @@ TC80_PARAMETERS = {
         dtype=gas_model,
         writable=True,
         default=0,
+    ),
+
+    "temp_power_stage": Parameter(
+        node_id="_324_TmpPwrStg",
+        dtype=int
+    ),
+
+    "temp_electronics": Parameter(
+        node_id="_326_TempElec",
+        dtype=int
+    ),
+
+    "temp_lower": Parameter(
+        node_id="_330_TempPmpBot",
+        dtype=int
     )
+
 }
 
 MVP_PARAMETERS = {
+    "temperature": Parameter(
+        node_id="_330_TempPump",
+        dtype=int,
+    )
     
 }
 
