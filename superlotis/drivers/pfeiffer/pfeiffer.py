@@ -13,7 +13,7 @@ try:
     turbo = Pump(controller, "TC80", 1)
     backing = Pump(controller, "MVP", 2)
 
-    backing.pumping_power = False
+    turbo.pumping_power = True
 
     while True:
 
