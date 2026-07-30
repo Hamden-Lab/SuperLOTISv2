@@ -1,6 +1,7 @@
 import serial
+import serial.tools.list_ports
 import struct
-from superlotis.tools.constants import PCG550_SERIAL_PORT, PSG550_SERIAL_PORT
+from typing import Dict, Optional
 
 class PxG55xRS485:
     """
@@ -202,12 +203,54 @@ class PxG55xRS485:
         """
         self.write_pid(224, bytes([unit]))
 
+
+def infer_gauge_label(product_name: str) -> Optional[str]:
+    normalized = (product_name or "").strip().upper()
+    if "PCG550" in normalized:
+        return "PCG550"
+    if "PSG550" in normalized:
+        return "PSG550"
+    return None
+
+
+def discover_gauge_ports(port_candidates=None, timeout=2.0) -> Dict[str, str]:
+    if port_candidates is None:
+        ports = list(serial.tools.list_ports.comports())
+        port_candidates = [port.device for port in ports]
+
+    discovered: Dict[str, str] = {}
+    for port in port_candidates:
+        probe = None
+        try:
+            probe = PxG55xRS485(port=port, timeout=timeout)
+            product_name = probe.get_product_name()
+            label = infer_gauge_label(product_name)
+            if label:
+                discovered[label] = port
+        except Exception:
+            continue
+        finally:
+            if probe is not None:
+                try:
+                    probe.close()
+                except Exception:
+                    pass
+
+    return discovered
+
+
 if __name__ == "__main__":
-    gauge1 = PxG55xRS485(port=PSG550_SERIAL_PORT)
-    gauge2 = PxG55xRS485(port=PCG550_SERIAL_PORT)
-    for gauge in [gauge1, gauge2]:
-        print("=============GAUGE==============")
-        print("Serial number:", gauge.get_serial_number())
-        print("Product name:", gauge.get_product_name())
-        print("Pressure (real):", gauge.get_pressure_real())
-        print("Pressure (fixed):", gauge.get_pressure_fixed())
+    discovered_ports = discover_gauge_ports()
+    if not discovered_ports:
+        print("No Inficon gauges detected on available serial ports.")
+    else:
+        for label, port in discovered_ports.items():
+            gauge = PxG55xRS485(port=port, timeout=2.0)
+            try:
+                print(f"============= {label} ({port}) =============")
+                print("Serial number:", gauge.get_serial_number())
+                print("Product name:", gauge.get_product_name())
+                print("Pressure (real):", gauge.get_pressure_real())
+                print("Pressure (fixed):", gauge.get_pressure_fixed())
+            finally:
+                gauge.close()
