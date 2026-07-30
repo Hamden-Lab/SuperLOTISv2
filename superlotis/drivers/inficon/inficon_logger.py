@@ -2,21 +2,19 @@ import argparse
 import logging
 import time
 
-from superlotis.drivers.inficon.inficon import PxG55xRS485
-from superlotis.tools.constants import PCG550_SERIAL_PORT, PSG550_SERIAL_PORT
+from superlotis.drivers.inficon.inficon import PxG55xRS485, discover_gauge_ports
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
 
 def build_gauges():
-    gauge_specs = [
-        ("PSG550", PSG550_SERIAL_PORT),
-        ("PCG550", PCG550_SERIAL_PORT),
-    ]
+    discovered_ports = discover_gauge_ports(timeout=2.0)
+    if not discovered_ports:
+        raise RuntimeError("No Inficon gauges could be identified on any available serial port.")
 
     gauges = {}
-    for label, port in gauge_specs:
+    for label, port in discovered_ports.items():
         try:
             gauges[label] = PxG55xRS485(port=port, timeout=2.0)
             logger.info("Connected %s on %s", label, port)
