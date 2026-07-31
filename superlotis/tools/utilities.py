@@ -8,7 +8,7 @@ import threading
 import socketserver
 from functools import partial
 import socket
-
+from typing import Any, Callable
 
 # =========================================================
 # PARSING SCHEDULER COMMAND LINES
@@ -318,7 +318,7 @@ class SchedulerPoller(object):
         port,
         scheduler,
         logger,
-        process_command: function,
+        process_command: Callable[[], Any], #function
         computer_id,
         device_id,
         timeout=5,
@@ -476,7 +476,7 @@ class CommandScheduler:
         self.scheduled = set()
         self.lock = threading.Lock()
 
-    def schedule(self, parsed: ParsedCommand, process_command: function):
+    def schedule(self, parsed: ParsedCommand, process_command: Callable[[], Any]): #function
         """
         Schedule a parsed command for future execution.
 
@@ -503,7 +503,7 @@ class CommandScheduler:
 
         thread.start()
 
-    def _execute_later(self, parsed: ParsedCommand, process_command: function):
+    def _execute_later(self, parsed: ParsedCommand, process_command: Callable[[], Any]): #function
         """
         Execute a command at its scheduled time.
 
