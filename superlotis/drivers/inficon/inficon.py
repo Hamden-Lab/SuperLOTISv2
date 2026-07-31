@@ -2,6 +2,7 @@ import serial
 import serial.tools.list_ports
 import struct
 from typing import Dict, Optional
+import time
 
 class PxG55xRS485:
     """
@@ -253,4 +254,25 @@ if __name__ == "__main__":
                 print("Pressure (real):", gauge.get_pressure_real())
                 print("Pressure (fixed):", gauge.get_pressure_fixed())
             finally:
+                gauge.close()
+
+    continuous_monitoring = True
+    if continuous_monitoring:
+        if not discovered_ports:
+                print("No Inficon gauges detected on available serial ports.")
+        else:
+            try:
+                while True:
+                    for label, port in discovered_ports.items():
+                        gauge = PxG55xRS485(port=port, timeout=2.0)
+                        try:
+                            print(f"============= {label} ({port}) =============")
+                            print("Serial number:", gauge.get_serial_number())
+                            print("Product name:", gauge.get_product_name())
+                            print("Pressure (real):", gauge.get_pressure_real())
+                            print("Pressure (fixed):", gauge.get_pressure_fixed())
+                            time.sleep(10)
+                        finally:
+                            gauge.close()
+            except KeyboardInterrupt:
                 gauge.close()
