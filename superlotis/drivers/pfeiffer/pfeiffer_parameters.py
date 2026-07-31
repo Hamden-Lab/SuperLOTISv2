@@ -52,6 +52,21 @@ COMMON_PARAMETERS = {
     "actual_speed": Parameter(
         node_id="_309_ActualSpd",
         dtype=int
+    ),
+
+    "drv_current": Parameter(
+        node_id="_310_DrvCurrent",
+        dtype=float
+    ),
+
+    "drv_voltage": Parameter(
+        node_id="_313_DrvVoltage",
+        dtype=float
+    ),
+
+    "drv_power": Parameter(
+        node_id="_316_DrvPower",
+        dtype=int
     )
 }
 
@@ -95,6 +110,18 @@ TC80_PARAMETERS = {
         default=0,
     ),
 
+    "cfg_acc_a1": Parameter(
+        node_id="_035_Cfg Acc A1",
+        dtype=int,
+        writable=False,
+        default=0,
+    ),
+
+    "temp_management_mode": Parameter(
+        node_id="_058_TmpMgtMode",
+        dtype=int
+    ),
+
     "temp_power_stage": Parameter(
         node_id="_324_TmpPwrStg",
         dtype=int
@@ -108,7 +135,14 @@ TC80_PARAMETERS = {
     "temp_lower": Parameter(
         node_id="_330_TempPmpBot",
         dtype=int
+    ),
+
+    "temp_rotor": Parameter(
+        node_id="_384_TempRotor",
+        dtype=int
     )
+
+    
 
 }
 
