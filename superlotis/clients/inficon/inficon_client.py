@@ -8,13 +8,11 @@ import time
 from pathlib import Path
 from typing import Dict, Optional
 
-import serial.tools.list_ports
-
 ROOT_DIR = Path(__file__).resolve().parents[3]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from superlotis.drivers.inficon.inficon import PxG55xRS485
+from superlotis.drivers.inficon.inficon import PxG55xRS485, discover_gauge_ports
 
 from superlotis.tools.constants import SLOTIS_STATUS_SERVER_IP_ADDRESS, SLOTIS_STATUS_SERVER_PORT, TEST_STATUS_SERVER_PORT, TEST_STATUS_SERVER_HOST
 
@@ -29,61 +27,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def normalize_label(value: str) -> str:
-    return value.strip().upper()
-
-
-def infer_gauge_label(product_name: str) -> Optional[str]:
-    product_name = normalize_label(product_name)
-    if "PCG550" in product_name:
-        return "PCG550"
-    if "PSG550" in product_name:
-        return "PSG550"
-    return None
-
-
 def scan_serial_ports_for_inficon() -> Dict[str, Dict[str, str]]:
     ports = list(serial.tools.list_ports.comports())
     found: Dict[str, Dict[str, str]] = {}
 
-    for port in ports:
-        description = (port.description or "").strip()
-        product = (port.product or "").strip()
-        candidate_label = None
-
-        if description:
-            candidate_label = infer_gauge_label(description)
-        if candidate_label is None and product:
-            candidate_label = infer_gauge_label(product)
-
-        if candidate_label is None:
-            probe = None
-            try:
-                probe = PxG55xRS485(port.device, timeout=SCAN_TIMEOUT)
-                product_name = probe.get_product_name()
-                candidate_label = infer_gauge_label(product_name)
-            except Exception:
-                continue
-            finally:
-                if probe:
-                    try:
-                        probe.close()
-                    except Exception:
-                        pass
-
-        if candidate_label:
-            found[candidate_label] = {
-                "device": port.device,
-                "description": description,
-                "product": product,
-            }
-            logger.info(
-                "Detected Inficon gauge %s on %s (description=%s, product=%s)",
-                candidate_label,
-                port.device,
-                description,
-                product,
-            )
+    discovered_ports = discover_gauge_ports([port.device for port in ports], timeout=SCAN_TIMEOUT)
+    for label, port_device in discovered_ports.items():
+        port = next((candidate for candidate in ports if candidate.device == port_device), None)
+        description = (port.description or "").strip() if port else ""
+        product = (port.product or "").strip() if port else ""
+        found[label] = {
+            "device": port_device,
+            "description": description,
+            "product": product,
+        }
+        logger.info(
+            "Detected Inficon gauge %s on %s (description=%s, product=%s)",
+            label,
+            port_device,
+            description,
+            product,
+        )
 
     return found
 
