@@ -35,10 +35,12 @@ PORT = TEST_SCHEDULER_SERVER_PORT
 
 data_lock = Lock()
 
-data = """now 0 LYMAN PDU poweroff 2
-now 15 LYMAN PDU poweron 2
-now 30 LYMAN PDU get status 2
-"""
+# data = """now 0 LYMAN PDU poweroff 2
+# now 15 LYMAN PDU poweron 2
+# now 30 LYMAN PDU get status 2
+# """
+
+data = """now 30 LYMAN PDU get status 2"""
 
 # =========================================================
 # COMMAND PROCESSING
