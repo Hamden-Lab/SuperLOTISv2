@@ -8,6 +8,7 @@ Through Microsoft Store:
 - Git
 - GitHub Desktop
 - Anydesk
+- Picam (to run SOPHIA camera : https://www.teledynevisionsolutions.com/products/picam-sdk-amp-driver/?model=PICAM64&vertical=tvs-princeton-instruments&segment=tvs/#Downloads)
 
 PDU configuration:
 ==================
