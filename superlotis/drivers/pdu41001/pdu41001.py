@@ -254,6 +254,7 @@ class PDU41001(object):
         return results
 
 if __name__ == "__main__":
+    print("STARTING PDU")
     pdu = PDU41001(host=PDU41001_IP_ADDRESS, user=PDU41001_USER, password=PDU41001_PASSWORD)
     pdu.connect()
     pdu.get_status()
