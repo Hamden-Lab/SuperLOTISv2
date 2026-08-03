@@ -1,6 +1,9 @@
 # SuperLOTISv2
 Repo containing code for SuperLOTIS upgrade (SOPHIA camera, Pfeiffer Vacuum Pump and INFICON Vacuum Gauge)
 
+## Issues
+- KS : SOPHIA camera does not work through the StarTech USB Hub. Probable cause(s): https://chatgpt.com/s/t_6a70db7d7ffc81919d7addffe3072537, but works through the single 15ft USB3.0 cable. Needs to buy another one I guess.
+
 ## Architecture
 * Python scripts to control/command/communicate with devices directly are located in `drivers/`
 * Intermediate socket-based interface are located in `clients/`
@@ -14,6 +17,7 @@ Repo containing code for SuperLOTIS upgrade (SOPHIA camera, Pfeiffer Vacuum Pump
 * paramiko: SSH session
 * typing-extensions
 * keyring
+* astropy
 
 ## Create the conda environment from file
 ```
@@ -115,3 +119,117 @@ now 1 SLOTIS TCS 4 DISEPOCH 2000.0
 0 31 19 18 05 2023 374 SLOTIS SICAM setexp 3000
 0 31 19 18 05 2023 377 SLOTIS SICAM expose
 ```
+
+
+### SOPHIA get all attributes response
+
+```python
+Dictionary('ADC Analog Gain': High
+'ADC Bit Depth': 16
+'ADC Quality': Low Noise
+'ADC Speed': 1.0
+'Active Bottom Margin': 3
+'Active Height': 2048
+'Active Left Margin': 50
+'Active Right Margin': 50
+'Active Shutter': None
+'Active Top Margin': 2
+'Active Width': 2048
+'CCD Characteristics': Back Illuminated & U.V. Enhanced & Multi-Port
+'Clean Cycle Count': 1
+'Clean Cycle Height': 2048
+'Clean Serial Register': True
+'Clean Until Trigger': True
+'Cooling Fan Status': On
+'Correct Pixel Bias': True
+'Disable Cooling Fan': False
+'Disable Data Formatting': False
+'Exact Readout Count Maximum': 1000000000000
+'Exposure Time': 100.0
+'External Shutter Status': Not Connected
+'External Shutter Type': Vincent CS45
+'Frame Rate Calculation': 0.22867631860928136
+'Frame Size': 8388608
+'Frame Stride': 8388608
+'Frame Tracking Bit Depth': 64
+'Frames per Readout': 1
+'Gap Height': 0.0
+'Gap Width': 0.0
+'Internal Shutter Status': Not Connected
+'Internal Shutter Type': Vincent CS45
+'Invert Output Signal': False
+'Invert Output Signal-2': False
+'Kinetics Window Height': 10
+'Online Readout Rate Calculation': 0.23402798440173528
+'Orientation': Normal
+'Output Signal': Exposing
+'Output Signal-2': Reading Out
+'Pixel Bit Depth': 16
+'Pixel Format': Monochrome 16-bit
+'Pixel Height': 13.5
+'Pixel Width': 13.5
+'ROIs': [CPicamRoi(x=0, width=2048, x_binning=1, y=0, height=2048, y_binning=1)]
+'Readout Control Mode': Full Frame
+'Readout Count': 1
+'Readout Orientation': Normal
+'Readout Port Count': 1
+'Readout Rate Calculation': 0.22867631860928136
+'Readout Stride': 8388608
+'Readout Time Calculation': 4272.99326
+'Sensor Active Bottom Margin': 3
+'Sensor Active Extended Height': 0
+'Sensor Active Height': 2048
+'Sensor Active Left Margin': 50
+'Sensor Active Right Margin': 50
+'Sensor Active Top Margin': 2
+'Sensor Active Width': 2048
+'Sensor Masked Bottom Margin': 0
+'Sensor Masked Height': 0
+'Sensor Masked Top Margin': 0
+'Sensor Secondary Active Height': 0
+'Sensor Secondary Masked Height': 0
+'Sensor Temperature Reading': 19.0
+'Sensor Temperature Set Point': 25.0
+'Sensor Temperature Status': Unlocked
+'Sensor Type': CCD
+'Shutter Closing Delay': 0.0
+'Shutter Delay Resolution': 1000.0
+'Shutter Opening Delay': 0.0
+'Shutter Timing Mode': Normal
+'Time Stamp Bit Depth': 64
+'Time Stamp Resolution': 10000000
+'Time Stamps': None
+'Track Frames': False
+'Trigger Determination': Rising Edge
+'Trigger Response': No Response
+'Vertical Shift Rate': 12.0)
+```
+
+
+### Populate the headers of FITS images taken by SOPHIA from the status server
+
+INSTRUMENT = 'SuperLOTIS telescope'
+CCDNAME = 'Princeton Instruments E2V'
+CCDTEMP
+CCDTARGETTEMP
+CHILLERTEMP
+PUMP_PRESSURE
+CAM_PRESSURE
+VACUUM_VALVE
+PDU_OUT1...
+EXPTIME
+DATE-OBS
+MJD
+FILTER
+MOUNTRA
+MOUNTDEC
+MOUNTHA
+MOUNTALT
+MOUNTAZ
+OBJECT
+AIRMASS
+WEATHER_...
+CCDGAIN
+BINNING
+SHUTTER_STATUS
+IMTYPE : light, dark, bias, flat...
