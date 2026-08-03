@@ -7,14 +7,15 @@ class SOPHIA(object):
 
     def __init__(self):
         self.cam = PrincetonInstruments.PicamCamera(SOPHIA_SN)
+        print("CONNECTED TO SOPHIA CAMERA")
 
     def take_exposure(self):
         data = self.cam.grab(nframes=1, frame_timeout=SOPHIA_FRAME_TIMEOUT)
-        return data
+        return data[0]
+
+    def save_image(self, data, header):
+        pass
     
-    #def take_dark(self):
-
-
     def take_bias(self):
         temp_exptime = self.cam.get_attribute_value("Exposure Time")
 
@@ -39,9 +40,15 @@ class SOPHIA(object):
     def get_all_attributes(self):
         # Get all attribute values of the camera (dict that can be stored as FITS headers)
         return self.cam.get_all_attribute_values()
-    
-    def get_status(self):
-        return self.cam.get_attribute_value("Exposure Status")
+
+    def open(self):
+        return self.cam.open()
+
+    def close(self):
+        return self.cam.close()
+
+    def is_open(self):
+        return self.cam.is_opened()
 
 if __name__ == "__main__":
     sophia = SOPHIA()
