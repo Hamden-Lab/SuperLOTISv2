@@ -40,7 +40,9 @@ data_lock = Lock()
 # now 30 LYMAN PDU get status 2
 # """
 
-data = """now 30 LYMAN PDU get status 2"""
+data = """now 5 LYMAN SOPHIA get exptime
+now 10 LYMAN SOPHIA set exptime 0.001
+now 20 LYMAN SOPHIA expose"""
 
 # =========================================================
 # COMMAND PROCESSING
