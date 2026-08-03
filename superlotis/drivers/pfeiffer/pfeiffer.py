@@ -1,47 +1,50 @@
-import os
 from superlotis.drivers.pfeiffer.pfeiffer_controller import Controller, Pump
 from superlotis.tools.constants import PFEIFFER_IP_ADDRESS, PFEIFFER_PORT
-import socket
-import time
 
 url = f"opc.tcp://{PFEIFFER_IP_ADDRESS}:{PFEIFFER_PORT}"
 
-try:
-    controller = Controller(url)
-    controller.client.connect()
+class Pfeiffer:
 
-    turbo = Pump(controller, "TC80", 1)
-    backing = Pump(controller, "MVP", 2)
+    def __init__(self):
 
-    backing.pumping_power = True
+        self.controller = Controller(url)
+        self.controller.client.connect()
+    
+        self.turbo = Pump(self.controller, "TC80", 1)
+        self.backing = Pump(self.controller, "MVP", 2)
 
-    turbo.pumping_power = True
+    def start_turbo(self):
+        self.turbo.pumping_power = True
 
-    while True:
+    def start_backing(self):
+        self.backing.pumping_power = True
 
-        print(f"Backing temperature: {backing.temperature}")
+    def stop_turbo(self):
+        self.turbo.pumping_power = False
 
-        print(f"Turbo power stage temperature: {turbo.temp_power_stage}")
-        print(f"Turbo electronics temperature: {turbo.temp_electronics}")
-        print(f"Turbo lower temperature: {turbo.temp_lower}")
-        print(f"Turbo pump speed: {turbo.actual_speed}")
-        print(f"Turbo driving voltage (V): {turbo.drv_voltage:.2f}")
-        print(f"Turbo driving current (A): {turbo.drv_current:.2f}")
-        print(f"Turbo driving power (W): {turbo.drv_power}")
-        print(f"Turbo rotor temperature (C): {turbo.temp_rotor}")
+    def stop_backing(self):
+        self.backing.pumping_power = False
 
-        print(f"Turbo temperature management mode: {turbo.cfg_acc_a1}")
+    def status(self):
 
-        print(f"Configuration accessory connection A1: {turbo.cfg_acc_a1}")
+        self.status_dict = {"Backing temperature": self.backing.temperature, 
+                    "Turbo power stage temperature": self.turbo.temp_power_stage,
+                    "Turbo electronics temperature": self.turbo.temp_electronics,
+                    "Turbo lower temperature": self.turbo.temp_lower,
+                    "Turbo pump speed": self.turbo.actual_speed,
+                    "Turbo driving voltage (V)": self.turbo.drv_voltage,
+                    "Turbo driving current (A)": self.turbo.drv_current,
+                    "Turbo driving power (W)": self.turbo.drv_power,
+                    "Turbo rotor temperature (C)": self.turbo.temp_rotor,
+                    "Turbo temperature management mode": self.turbo.cfg_acc_a1,
+                    "Configuration accessory connection A1": self.turbo.cfg_acc_a1,
+                    "Backing pump error": self.backing.error_code,
+                    "Turbo pump error": self.turbo.error_code}
+        return self.status_dict
 
+    def close(self):
+        self.controller.client.disconnect()
         
-
-        print(f"Backing pump error: {backing.error_code}")
-        print(f"Turbo pump error: {turbo.error_code}")
-
-        time.sleep(5)
-
-except KeyboardInterrupt:
-
-# time.sleep(15)
-    controller.client.disconnect()
+if __name__ == "__main__":
+    pfeiffer = Pfeiffer()
+    print(pfeiffer.status())
