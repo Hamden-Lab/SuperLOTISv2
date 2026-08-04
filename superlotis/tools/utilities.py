@@ -85,12 +85,12 @@ def parse_schedule_line(line: str, computer_id: str, device_id: str) -> Optional
 
     if match:
 
-        computer_id = match.group("computer_id")
-        device_id = match.group("device_id")
+        parsed_computer_id = match.group("computer_id")
+        parsed_device_id = match.group("device_id")
 
         if (
-            computer_id != computer_id
-            or device_id != device_id
+            parsed_computer_id != computer_id
+            or parsed_device_id != device_id
         ):
             return None
 
@@ -101,8 +101,8 @@ def parse_schedule_line(line: str, computer_id: str, device_id: str) -> Optional
         return ParsedCommand(
             raw_line=line,
             execute_at=execute_at,
-            computer_id=computer_id,
-            device_id=device_id,
+            computer_id=parsed_computer_id,
+            device_id=parsed_device_id,
             command=match.group("command"),
         )
 
@@ -114,12 +114,12 @@ def parse_schedule_line(line: str, computer_id: str, device_id: str) -> Optional
 
     if match:
 
-        computer_id = match.group("computer_id")
-        device_id = match.group("device_id")
+        parsed_computer_id = match.group("computer_id")
+        parsed_device_id = match.group("device_id")
 
         if (
-            computer_id != computer_id
-            or device_id != device_id
+            parsed_computer_id != computer_id
+            or parsed_device_id != device_id
         ):
             return None
 
@@ -263,7 +263,7 @@ class UDPServerThread:
         Logs the server endpoint and begins processing incoming UDP
         requests.
         """
-        self.logger.info(
+        self.logger.warning(
             "%s: local UDP server started on %s:%s",
             self.device_id,
             self.host,
@@ -279,7 +279,7 @@ class UDPServerThread:
         Shuts down the server loop, closes the underlying socket, and
         blocks until the server thread has terminated.
         """
-        self.logger.info(
+        self.logger.warning(
             "%s: stopping UDP server",
             self.device_id
         )
@@ -293,7 +293,7 @@ class UDPServerThread:
         # Wait for the server thread to terminate.
         self.thread.join()
 
-        self.logger.info(
+        self.logger.warning(
             "%s: UDP server stopped",
             self.device_id
         )
@@ -346,7 +346,7 @@ class SchedulerPoller(object):
         self.timeout = timeout
         self.poll_interval = poll_interval
 
-        self.logger.info(
+        self.logger.warning(
             "%s: starting master polling thread",
             self.device_id
         )
@@ -368,7 +368,7 @@ class SchedulerPoller(object):
 
         self.poll_scheduler_server_thread.start()
 
-        self.logger.info(
+        self.logger.warning(
             "%s: START SCHEDULER SERVER POLLING THREAD",
             self.device_id
         )
@@ -384,7 +384,7 @@ class SchedulerPoller(object):
 
         self.poll_scheduler_server_thread.join()
 
-        self.logger.info(
+        self.logger.warning(
             "%s: STOP SCHEDULER SERVER POLLING THREAD",
             self.device_id
         )
@@ -599,7 +599,7 @@ class DeviceStatusReporter:
 
         self.thread.start()
 
-        self.logger.info(
+        self.logger.warning(
             "%s: START DEVICE STATUS REPORTER THREAD",
             self.device_id
         )
@@ -615,7 +615,7 @@ class DeviceStatusReporter:
 
         self.thread.join()
 
-        self.logger.info(
+        self.logger.warning(
             "%s: STOP DEVICE STATUS REPORTER THREAD",
             self.device_id
         )
