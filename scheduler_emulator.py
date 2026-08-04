@@ -40,9 +40,17 @@ data_lock = Lock()
 # now 30 LYMAN PDU get status 2
 # """
 
-data = """now 5 LYMAN SOPHIA get exptime
-now 10 LYMAN SOPHIA set exptime 0.001
-now 20 LYMAN SOPHIA expose"""
+# data = """now 5 LYMAN SOPHIA get exptime
+# now 10 LYMAN SOPHIA set exptime 0.001
+# now 20 LYMAN SOPHIA expose"""
+
+# data = """now 6 LYMAN INFICON get pressure camera
+# now 11 LYMAN INFICON get pressure pump"""
+
+# data = """now 6 LYMAN CHILLER get temperature
+# now 11 LYMAN CHILLER get pump temperature"""
+
+data = """now 6 LYMAN CHILLER get backing_temperature"""
 
 # =========================================================
 # COMMAND PROCESSING
