@@ -157,9 +157,11 @@ if __name__ == "__main__":
 
     for port in list_ports.comports():
         if port.serial_number == PSG550_SERIAL_NUMBER:
-            pump_gauge = PxG55xRS485(port=port.device, timeout=2.0)
+            pump_gauge = PxG55xRS485(port=port.device)
+            pump_gauge.connect()
         if port.serial_number == PCG550_SERIAL_NUMBER:
-            camera_gauge = PxG55xRS485(port=port.device, timeout=2.0)
+            camera_gauge = PxG55xRS485(port=port.device)
+            camera_gauge.connect()
 
     logger.info(
         "%s: devices connected",
