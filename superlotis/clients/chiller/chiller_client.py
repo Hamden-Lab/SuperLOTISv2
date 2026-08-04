@@ -1,306 +1,380 @@
-import argparse
-import datetime
-import logging
-import socket
-import socketserver
-import sys
-import threading
-import time
-from pathlib import Path
-from typing import List
-
+from serial.tools import list_ports
 from superlotis.drivers.chiller.chiller import TCubeChiller
-from superlotis.tools.constants import (
-    SLOTIS_SCHEDULER_IP_ADDRESS,
-    SLOTIS_SCHEDULER_PORT,
-    SLOTIS_STATUS_SERVER_IP_ADDRESS,
-    SLOTIS_STATUS_SERVER_PORT,
-)
+from superlotis.tools.constants import CHILLER_SERIAL_NUMBER, CHILLER_SOCKET_IP_ADDRESS, CHILLER_SOCKET_PORT, CHILLER_SERIAL_BAUDRATE, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL
+from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, UDPServerThread
+import time
+import logging
+from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+# =========================================================
+# CONFIG
+# =========================================================
+
+# Identification string of the device for logging
+COMPUTER_ID = "LYMAN"
+DEVICE_ID = "CHILLER"
+
+# Device socket server
+DEVICE_SERVER_HOST = CHILLER_SOCKET_IP_ADDRESS
+DEVICE_SERVER_PORT = CHILLER_SOCKET_PORT
+
+# =========================================================
+# LOGGING
+# =========================================================
+
+LOG_FILE = Path(f"{DEVICE_ID}_client.log")
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler()
+    ]
 )
+
 logger = logging.getLogger(__name__)
 
+# =========================================================
+# CHILLER COMMAND PROCESSING
+# =========================================================
 
-def parse_schedule_time(token: str) -> float:
-    token = token.strip().lower()
-    if token in ("now", "immediate"):
-        return 0.0
+def process_command(command):
 
-    if token.startswith("+"):
-        return float(token[1:])
+    command = command.strip()
 
-    try:
-        return float(token)
-    except ValueError:
-        pass
+    logger.info("%s: processing '%s'", DEVICE_ID, command)
 
-    try:
-        dt = datetime.datetime.fromisoformat(token)
-        now = datetime.datetime.now(dt.tzinfo)
-        return max((dt - now).total_seconds(), 0.0)
-    except ValueError:
-        pass
+    # reconnect if needed
+    if not chiller.is_open():
+        logger.warning("%s: reconnecting serial interface", DEVICE_ID)
+        chiller.connect()
 
-    try:
-        parts = token.split(":")
-        if len(parts) == 3:
-            hour, minute, second = map(int, parts)
-            now = datetime.datetime.now()
-            target = now.replace(hour=hour, minute=minute, second=second, microsecond=0)
-            if target < now:
-                target += datetime.timedelta(days=1)
-            return (target - now).total_seconds()
-    except Exception:
-        pass
+    # =====================================================
+    # power on
+    # =====================================================
 
-    raise ValueError(f"Invalid time token: {token}")
+    if command.startswith("start"):
 
-
-def execute_chiller_command(chiller: TCubeChiller, command_tokens: List[str]) -> str:
-    if not command_tokens:
-        return "No command provided"
-
-    cmd = command_tokens[0].lower()
-    if cmd == "get":
-        if len(command_tokens) < 2:
-            return "Missing get parameter"
-
-        param = command_tokens[1].lower()
         try:
-            if param in ("temperature", "real", "actual"):
-                return str(chiller.get_temperature())
-            if param in ("setpoint", "set", "temperature_setpoint"):
-                return str(chiller.get_setpoint())
-            return f"Unknown get parameter: {param}"
+            chiller.start()
+
+            logger.info(
+                "%s: start chiller",
+                DEVICE_ID,
+            )
+
+            return f"chiller started"
+
         except Exception:
-            logger.exception("Failed to read %s", param)
-            return f"Error reading {param}"
+            logger.exception("%s: start chiller failed", DEVICE_ID)
+            return "error"
 
-    if cmd == "set":
-        if len(command_tokens) < 3:
-            return "Missing set parameter or value"
+    # =====================================================
+    # power off
+    # =====================================================
 
-        param = command_tokens[1].lower()
-        value = command_tokens[2]
-        try:
-            if param in ("temperature", "setpoint", "set"):
-                chiller.set_setpoint(float(value))
-                return f"Setpoint set to {value}"
-            return f"Unknown set parameter: {param}"
-        except Exception:
-            logger.exception("Failed to set %s to %s", param, value)
-            return f"Error setting {param}"
+    elif command.startswith("stop"):
 
-    if cmd == "run":
-        try:
-            chiller.run()
-            return "Chiller started"
-        except Exception:
-            logger.exception("Failed to run chiller")
-            return "Error starting chiller"
-
-    if cmd == "stop":
         try:
             chiller.stop()
-            return "Chiller stopped"
+
+            logger.info(
+                "%s: stop chiller",
+                DEVICE_ID,
+            )
+
+            return f"chiller stopped"
+
         except Exception:
-            logger.exception("Failed to stop chiller")
-            return "Error stopping chiller"
+            logger.exception("%s: stop chiller failed", DEVICE_ID)
+            return "error"
 
-    return f"Unknown command: {cmd}"
+    # =====================================================
+    # get run state
+    # =====================================================
 
+    elif command.startswith("get runstate"):
 
-def schedule_command(chiller: TCubeChiller, line: str) -> str:
-    line = line.strip()
-    if not line:
-        return "Empty line"
-
-    parts = line.split()
-    if len(parts) < 2:
-        return f"Invalid line: {line}"
-
-    time_token = parts[0]
-    command_tokens = parts[1:]
-
-    try:
-        delay = parse_schedule_time(time_token)
-    except ValueError as exc:
-        return str(exc)
-
-    if delay <= 0:
-        result = execute_chiller_command(chiller, command_tokens)
-        logger.info("Executed immediately: %s => %s", line, result)
-        return f"EXECUTED: {result}"
-
-    def task() -> None:
-        result = execute_chiller_command(chiller, command_tokens)
-        logger.info("Scheduled command executed after %.1f sec: %s => %s", delay, line, result)
-
-    timer = threading.Timer(delay, task)
-    timer.daemon = True
-    timer.start()
-    return f"SCHEDULED in {delay:.1f}s: {line}"
-
-
-def process_scheduler_payload(payload: bytes, chiller: TCubeChiller) -> bytes:
-    message = payload.decode("utf-8", errors="replace")
-    lines = [line for line in message.splitlines() if line.strip()]
-    if not lines:
-        return b"No scheduler commands received"
-
-    responses = []
-    for line in lines:
-        response = schedule_command(chiller, line)
-        responses.append(response)
-    return "\n".join(responses).encode("utf-8")
-
-
-class ChillerUDPHandler(socketserver.BaseRequestHandler):
-    def handle(self):
-        data = self.request[0].strip()
-        udp_socket = self.request[1]
-        logger.info("Scheduler request from %s: %s", self.client_address, data.decode("utf-8", errors="replace"))
-        response = process_scheduler_payload(data, self.server.chiller)
-        udp_socket.sendto(response, self.client_address)
-
-
-class ChillerUDPServer(socketserver.ThreadingUDPServer):
-    allow_reuse_address = True
-
-    def __init__(self, server_address, handler_class, chiller: TCubeChiller):
-        super().__init__(server_address, handler_class)
-        self.chiller = chiller
-
-
-def status_stream(chiller: TCubeChiller, status_host: str, status_port: int, interval: float, stop_event: threading.Event) -> None:
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        logger.info("Starting chiller status stream to %s:%s every %.1f seconds", status_host, status_port, interval)
-        while not stop_event.is_set():
-            try:
-                setpoint = chiller.get_setpoint()
-                temperature = chiller.get_temperature()
-                payload = (
-                    f"set temperature {setpoint:.1f}\n"
-                    f"real temperature {temperature:.1f}\n"
-                ).encode("utf-8")
-                sock.sendto(payload, (status_host, status_port))
-                logger.debug("Sent chiller status update to %s:%s", status_host, status_port)
-            except Exception:
-                logger.exception("Failed to send chiller status update")
-
-            stop_event.wait(interval)
-
-
-def tcp_temperature_stream(chiller: TCubeChiller, status_host: str, status_port: int, interval: float, stop_event: threading.Event) -> None:
-    """Send the current chiller temperature to the status server over TCP every `interval` seconds.
-
-    The message format is: "set chiller_temp {T}" (single line). The function will attempt
-    to reconnect on failure and stop when `stop_event` is set.
-    """
-    logger.info("Starting chiller TCP temperature stream to %s:%s every %.1f seconds", status_host, status_port, interval)
-    sock = None
-    while not stop_event.is_set():
         try:
-            if sock is None:
-                sock = socket.create_connection((status_host, status_port), timeout=5)
+            run_state = chiller.get_run_state()
+
+            logger.info(
+                "%s: chiller run_state = %s",
+                DEVICE_ID, run_state
+            )
+
+            return f"chiller runstate = {run_state}"
+
+        except Exception:
+            logger.exception("%s: chiller read runstate failed", DEVICE_ID)
+            return "error"
+
+    # =====================================================
+    # get pwm
+    # =====================================================
+
+    elif command.startswith("get pwm"):
+
+        try:
+            pwm = chiller.get_pwm()
+
+            logger.info(
+                "%s: chiller pwm = %s",
+                DEVICE_ID, pwm
+            )
+
+            return f"chiller pwm = {pwm}"
+
+        except Exception:
+            logger.exception("%s: chiller read pwm failed", DEVICE_ID)
+            return "error"
+        
+    # =====================================================
+    # get status
+    # =====================================================
+
+    elif command.startswith("get status"):
+
+        try:
+            status = chiller.get_status()
+
+            logger.info(
+                "%s: chiller status = %s",
+                DEVICE_ID, status
+            )
+
+            return f"chiller status = {status}"
+
+        except Exception:
+            logger.exception("%s: chiller read status failed", DEVICE_ID)
+            return "error"
+
+    # =====================================================
+    # get faults
+    # =====================================================
+
+    elif command.startswith("get faults"):
+
+        try:
+            faults = chiller.get_faults()
+
+            logger.info(
+                "%s: chiller faults = %s",
+                DEVICE_ID, faults
+            )
+
+            return f"chiller faults = {faults}"
+
+        except Exception:
+            logger.exception("%s: chiller read faults failed", DEVICE_ID)
+            return "error"
+
+    # =====================================================
+    # get all
+    # =====================================================
+
+    elif command.startswith("get all"):
+
+        try:
+            all_status = chiller.get_all()
+
+            logger.info(
+                "%s: chiller all status",
+                DEVICE_ID
+            )
+
+            return f"chiller all status"
+
+        except Exception:
+            logger.exception("%s: chiller read all status failed", DEVICE_ID)
+            return "error"
+        
+    # =====================================================
+    # get temperature
+    # =====================================================
+
+    elif command.startswith("get temperature"):
+
+        try:
             temperature = chiller.get_temperature()
-            payload = f"set chiller_temp {temperature:.1f}".encode("utf-8")
-            try:
-                sock.sendall(payload + b"\n")
-                logger.debug("Sent chiller TCP temperature to %s:%s", status_host, status_port)
-            except Exception:
-                # Reset socket to attempt reconnect on next loop
-                logger.exception("Failed to send over TCP, will reconnect")
-                try:
-                    sock.close()
-                except Exception:
-                    pass
-                sock = None
+
+            logger.info(
+                "%s: chiller temperature = %f",
+                DEVICE_ID, temperature
+            )
+
+            return f"chiller temperature = {temperature}"
+
         except Exception:
-            logger.exception("TCP connection error for chiller temperature stream")
-            if sock:
-                try:
-                    sock.close()
-                except Exception:
-                    pass
-            sock = None
+            logger.exception("%s: chiller read temperature failed", DEVICE_ID)
+            return "error"
 
-        stop_event.wait(interval)
+    # =====================================================
+    # get pump temperature
+    # =====================================================
 
-    if sock:
+    elif command.startswith("get pump temperature"):
+
         try:
-            sock.close()
+            temperature = chiller.get_pump_temperature()
+
+            logger.info(
+                "%s: chiller pump temperature = %f",
+                DEVICE_ID, temperature
+            )
+
+            return f"chiller pump temperature = {temperature}"
+
         except Exception:
-            pass
+            logger.exception("%s: chiller read pump temperature failed", DEVICE_ID)
+            return "error"
 
+    # =====================================================
+    # get setpoint
+    # =====================================================
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Chiller client with scheduler listener and status updates.")
-    parser.add_argument("--serial-port", required=True, help="Serial port for the chiller device.")
-    parser.add_argument("--scheduler-host", default=SLOTIS_SCHEDULER_IP_ADDRESS, help="Scheduler UDP listen host.")
-    parser.add_argument("--scheduler-port", type=int, default=SLOTIS_SCHEDULER_PORT, help="Scheduler UDP listen port.")
-    parser.add_argument("--status-host", default=SLOTIS_STATUS_SERVER_IP_ADDRESS, help="Slotis status server host.")
-    parser.add_argument("--status-port", type=int, default=SLOTIS_STATUS_SERVER_PORT, help="Slotis status server port.")
-    parser.add_argument("--interval", type=float, default=5.0, help="Status update interval in seconds.")
-    return parser.parse_args()
+    elif command.startswith("get setpoint"):
 
-
-def main() -> None:
-    args = parse_args()
-
-    chiller = TCubeChiller(args.serial_port)
-    chiller.connect()
-    logger.info("Connected to chiller on %s", args.serial_port)
-
-    try:
-        chiller.set_setpoint(0.0)
-        chiller.run()
-        logger.info("Chiller started with setpoint 0.0°C")
-    except Exception:
-        logger.exception("Failed to initialize chiller on startup")
-        chiller.disconnect()
-        return
-
-    stop_event = threading.Event()
-    status_thread = threading.Thread(
-        target=status_stream,
-        args=(chiller, args.status_host, args.status_port, args.interval, stop_event),
-        daemon=True,
-    )
-    status_thread.start()
-
-    tcp_thread = threading.Thread(
-        target=tcp_temperature_stream,
-        args=(chiller, args.status_host, args.status_port, 10.0, stop_event),
-        daemon=True,
-    )
-    tcp_thread.start()
-
-    with ChillerUDPServer((args.scheduler_host, args.scheduler_port), ChillerUDPHandler, chiller) as server:
-        logger.info("Listening for scheduler commands on %s:%s", args.scheduler_host, args.scheduler_port)
         try:
-            server.serve_forever()
-        except KeyboardInterrupt:
-            logger.info("Stopping chiller client")
-        finally:
-            stop_event.set()
-            status_thread.join(timeout=args.interval + 1.0)
-            tcp_thread.join(timeout=11.0)
-            try:
-                chiller.stop()
-                logger.info("Chiller stopped")
-            except Exception:
-                logger.exception("Error stopping chiller")
-            chiller.disconnect()
-            logger.info("Disconnected from chiller")
+            setpoint = chiller.get_setpoint()
 
+            logger.info(
+                "%s: chiller setpoint = %f",
+                DEVICE_ID, setpoint
+            )
+
+            return f"chiller setpoint = {setpoint}"
+
+        except Exception:
+            logger.exception("%s: chiller read setpoint failed", DEVICE_ID)
+            return "error"
+
+
+    # =====================================================
+    # set setpoint
+    # =====================================================
+
+    elif command.startswith("set setpoint "):
+
+        try:
+            setpoint = float(command.split()[2])
+
+            chiller.set_setpoint(setpoint)
+
+            logger.info(
+                "%s: set chiller setpoint = %f",
+                DEVICE_ID, setpoint
+            )
+
+            return f"set chiller setpoint = {setpoint}"
+
+        except Exception:
+            logger.exception("%s: chiller set setpoint failed", DEVICE_ID)
+            return "error"
+
+    return "unknown command"
+
+
+# =========================================================
+# STATUS SERVER SENDING STATUS OF DEVICE
+# =========================================================
+
+class OutletStatusReporter(DeviceStatusReporter):
+
+    """Inherits from generic DeviceStatusReporter class defined in superlotis.tools.utilities"""
+
+    def report_loop(self):
+        """
+        Continuously report device status information.
+
+        Polls the status of each device, formats the corresponding status
+        message, and sends it to the configured UDP endpoint. Any errors
+        encountered during status collection or transmission are logged and
+        do not terminate the reporting loop.
+        """
+        while self._running:
+
+            try:
+                all_status = chiller.get_all()
+                for key in all_status:
+                    msg = f"set chiller_{key} {all_status[key]}"
+
+                    self.client.sendto(
+                        msg.encode("utf-8"),
+                        (self.host, self.port)
+                    )
+
+                    logger.info(
+                        "%s: sent '%s' to %s:%d",
+                        self.device_id,
+                        msg,
+                        self.host,
+                        self.port
+                    )
+
+            except Exception:
+                logger.exception(
+                    "%s: chiller status reporting failed",
+                    self.device_id
+                )
+
+            # Wait before sending the next status update cycle.
+            time.sleep(self.interval)
+
+# =========================================================
+# MAIN
+# =========================================================
 
 if __name__ == "__main__":
-    main()
+
+    # =====================================================
+    # CONNECT DEVICE THROUGH DRIVER
+    # =====================================================
+
+    for port in list_ports.comports():
+        if port.serial_number == CHILLER_SERIAL_NUMBER:
+            chiller = TCubeChiller(port.device, baudrate=CHILLER_SERIAL_BAUDRATE)
+            chiller.connect()
+
+    logger.info(
+        "%s: device connected",
+        DEVICE_ID
+    )
+
+    # =====================================================
+    # START DEVICE SOCKET SERVER THREAD
+    # =====================================================
+
+    device_socket_server = UDPServerThread(host=DEVICE_SERVER_HOST, port=DEVICE_SERVER_PORT, logger=logger, process_command=process_command, device_id=DEVICE_ID)
+    device_socket_server.start()
+
+    # =====================================================
+    # START POLLING FROM SCHEDULER SERVER THREAD
+    # =====================================================
+
+    scheduler = CommandScheduler(logger=logger, device_id=DEVICE_ID)
+    scheduler_poller = SchedulerPoller(host=TEST_SCHEDULER_SERVER_HOST, port=TEST_SCHEDULER_SERVER_PORT, scheduler=scheduler, logger=logger, process_command=process_command, computer_id=COMPUTER_ID, device_id=DEVICE_ID, timeout=5, poll_interval=SLOTIS_SCHEDULER_POLL_INTERVAL)
+    scheduler_poller.start_polling_scheduler_server()
+
+    # =====================================================
+    # START OUTLET STATUS REPORTER THREAD
+    # =====================================================
+
+    status_reporter = OutletStatusReporter(host=TEST_STATUS_SERVER_HOST, port=TEST_STATUS_SERVER_PORT, logger=logger, device_id=DEVICE_ID, interval=SLOTIS_STATUS_POLL_INTERVAL)
+    status_reporter.start()
+
+    # =====================================================
+    # INFINITE LOOP STOPPED BY CTRL+C
+    # =====================================================
+
+    while True:
+        try:
+            time.sleep(1)
+        except KeyboardInterrupt:
+            device_socket_server.stop()
+            scheduler_poller.stop_polling_scheduler_server()
+            status_reporter.stop()
+            chiller.disconnect()
+            del chiller
+            break
