@@ -9,6 +9,10 @@ import socketserver
 from functools import partial
 import socket
 from typing import Any, Callable
+from email.message import EmailMessage
+import smtplib
+
+from superlotis.tools.constants import ALERT_EMAIL_ADDRESS, ALERT_EMAIL_BODY_BASE, ALERT_EMAIL_SUBJECT_BASE, ALERT_EMAIL_RCV
 
 # =========================================================
 # PARSING SCHEDULER COMMAND LINES
@@ -152,6 +156,22 @@ def parse_schedule_line(line: str, computer_id: str, device_id: str) -> Optional
         )
 
     return None
+
+def send_email_alert(system, error_message):
+    msg = EmailMessage()
+    msg.set_content(ALERT_EMAIL_BODY_BASE + error_message)
+    msg['Subject'] = ALERT_EMAIL_SUBJECT_BASE + system
+    msg['From'] = ALERT_EMAIL_ADDRESS
+    msg['To'] = ALERT_EMAIL_RCV
+
+    try:
+        # Connect to Gmail's secure SMTP server
+        with smtplib.SMTP_SSL('://gmail.com', 465) as server: #
+            server.login("your_gmail_address@gmail.com", "your_16_digit_app_password") #
+            server.send_message(msg)
+            print("Email alert sent successfully!")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
 
 
 # =========================================================
