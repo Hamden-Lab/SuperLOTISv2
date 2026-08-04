@@ -1,7 +1,7 @@
 from serial.tools import list_ports
 from superlotis.drivers.inficon.inficon import PxG55xRS485
-from superlotis.tools.constants import INFICON_SOCKET_IP_ADDRESS, INFICON_SOCKET_PORT, PSG550_SERIAL_NUMBER, PCG550_SERIAL_NUMBER, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL
-from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, UDPServerThread
+from superlotis.tools.constants import ALERT_INTERVAL_SECONDS, INFICON_SOCKET_IP_ADDRESS, INFICON_SOCKET_PORT, PSG550_SERIAL_NUMBER, PCG550_SERIAL_NUMBER, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL
+from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, UDPServerThread, send_email_alert
 import time
 import logging
 from pathlib import Path
@@ -100,6 +100,10 @@ class OutletStatusReporter(DeviceStatusReporter):
         encountered during status collection or transmission are logged and
         do not terminate the reporting loop.
         """
+
+        consecutive_failures = 0
+        last_email_alert_time = time.time()
+
         while self._running:
 
             try:
@@ -136,11 +140,22 @@ class OutletStatusReporter(DeviceStatusReporter):
                     self.port
                 )
 
+                consecutive_failures = 0
+                last_email_alert_time = time.time()
+
             except Exception:
                 logger.exception(
                     "%s: outlet status reporting failed",
                     self.device_id
                 )
+                consecutive_failures += 1
+
+                if consecutive_failures >= 5:
+                    current_time = time.time()
+
+                    if consecutive_failures == 5 or (current_time - last_email_alert_time) >= ALERT_INTERVAL_SECONDS:
+                        send_email_alert("Gauges", f"Outlet status reporting failed {consecutive_failures} times in a row. Check the device connection.")
+                        last_email_alert_time = current_time
 
             # Wait before sending the next status update cycle.
             time.sleep(self.interval)
