@@ -187,7 +187,7 @@ class OutletStatusReporter(DeviceStatusReporter):
 
             try:
                 # Report the current state of each managed outlet.
-                for outlet in range(1, PDU41001_NUMBER_OUTLETS):
+                for outlet in range(1, PDU41001_NUMBER_OUTLETS+1):
 
                     status = pdu.get_status(
                         outlet=outlet
