@@ -1,5 +1,6 @@
 import serial
-
+from serial.tools import list_ports
+from superlotis.tools.constants import CHILLER_SERIAL_NUMBER, CHILLER_SERIAL_BAUDRATE
 
 class TCubeChiller:
     """
@@ -19,7 +20,7 @@ class TCubeChiller:
     def __init__(
         self,
         port,
-        baudrate=9600,
+        baudrate=CHILLER_SERIAL_BAUDRATE,
         timeout=1.0,
         bytesize=serial.EIGHTBITS,
         parity=serial.PARITY_NONE,
@@ -77,7 +78,7 @@ class TCubeChiller:
         """Return control to local mode."""
         self._send("LOCAL")
 
-    def run(self):
+    def start(self):
         """Start the chiller."""
         self._send("RUN")
 
@@ -130,7 +131,9 @@ class TCubeChiller:
         return self._query("RUN?")
 
     def get_pwm(self):
-        """Current thermoelectric PWM (%)."""
+        """Current thermoelectric PWM (%).
+        A minus symbol, - , will preceed negative temperature values or PWM% when cooling.
+        """
         return float(self._query("PWM?"))
 
     def get_status(self):
@@ -199,15 +202,19 @@ class TCubeChiller:
             "pump_temperature": float(fields[2]),
             "pwm": float(fields[3]),
             "fan_pwm": float(fields[4]),
-            "tank_level_low": int(fields[5]),
+            "tank_level_low": float(fields[5]),
             "status": int(fields[6]),
             "faults": int(fields[7]),
         }
 
+    def is_open(self):
+        return self.ser.is_open
 
 if __name__ == '__main__':
 
-    chiller = TCubeChiller("/dev/ttyUSB0", baudrate=9600)
-    chiller.connect()
+    for port in list_ports.comports():
+        if port.serial_number == CHILLER_SERIAL_NUMBER:
+            chiller = TCubeChiller(port.device, baudrate=CHILLER_SERIAL_BAUDRATE)
+            chiller.connect()
 
     print("Identification:", chiller.identify())
