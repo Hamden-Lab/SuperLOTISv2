@@ -23,19 +23,34 @@ class PxG55xRS485:
         self,
         port,
         baudrate=57600,
+        timeout=2.0,
+        bytesize=serial.EIGHTBITS,
+        parity=serial.PARITY_NONE,
+        stopbits=serial.STOPBITS_ONE,
         address=1,
-        timeout=5.0,
+        
     ):
         self.address = address
+        self.port = port
+        self.baudrate = baudrate
+        self.timeout = timeout
+        self.bytesize = bytesize
+        self.parity = parity
+        self.stopbits = stopbits
 
+    def connect(self):
         self.ser = serial.Serial(
-            port=port,
-            baudrate=baudrate,
-            bytesize=serial.EIGHTBITS,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=timeout,
+            port=self.port,
+            baudrate=self.baudrate,
+            timeout=self.timeout,
+            bytesize=self.bytesize,
+            parity=self.parity,
+            stopbits=self.stopbits,
         )
+
+    def disconnect(self):
+        if self.ser is not None and self.ser.is_open:
+            self.ser.close()
 
     def close(self):
         self.ser.close()
@@ -209,9 +224,6 @@ class PxG55xRS485:
     def is_open(self):
         return self.ser.is_open
 
-    def connect(self):
-        self.ser.open()
-
 
 def infer_gauge_label(product_name: str) -> Optional[str]:
     normalized = (product_name or "").strip().upper()
@@ -252,7 +264,9 @@ if __name__ == "__main__":
 
     for port in list_ports.comports():
         if port.serial_number == PSG550_SERIAL_NUMBER:
-            pump_gauge = PxG55xRS485(port=port.device, timeout=2.0)
+            pump_gauge = PxG55xRS485(port=port.device)
+            pump_gauge.connect()
         if port.serial_number == PCG550_SERIAL_NUMBER:
-            camera_gauge = PxG55xRS485(port=port.device, timeout=2.0)
+            camera_gauge = PxG55xRS485(port=port.device)
+            camera_gauge.connect()
 
