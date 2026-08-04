@@ -38,3 +38,44 @@ Network configuration:
 lyman       192.168.1.1
 pfeiffer    192.168.1.100
 pdu41001    192.168.1.101
+
+
+
+
+PSG = pump gauge
+---------------------------------------
+Device: COM4
+Description: USB Serial Port (COM4)
+HWID: USB VID:PID=0403:6001 SER=BG01XA1ZA
+VID: 1027
+PID: 24577
+Serial number: BG01XA1ZA
+Manufacturer: FTDI
+Product: None
+Location: None
+
+PCG = camera gauge
+----------------------------------------
+Device: COM3
+Description: USB Serial Port (COM3)
+HWID: USB VID:PID=0403:6001 SER=BG02MO5LA
+VID: 1027
+PID: 24577
+Serial number: BG02MO5LA
+Manufacturer: FTDI
+Product: None
+Location: None
+
+
+Chiller
+----------------------------------------
+Device: COM5
+Description: USB Serial Port (COM5)
+HWID: USB VID:PID=0403:6001 SER=A90O3CT2A
+VID: 1027
+PID: 24577
+Serial number: A90O3CT2A
+Manufacturer: FTDI
+Product: None
+Location: None
+
