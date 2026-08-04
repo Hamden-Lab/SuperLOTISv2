@@ -1,8 +1,10 @@
 import serial
 import serial.tools.list_ports
+from serial.tools import list_ports
 import struct
 from typing import Dict, Optional
 import time
+from superlotis.tools.constants import PSG550_SERIAL_NUMBER, PCG550_SERIAL_NUMBER
 
 class PxG55xRS485:
     """
@@ -204,6 +206,12 @@ class PxG55xRS485:
         """
         self.write_pid(224, bytes([unit]))
 
+    def is_open(self):
+        return self.ser.is_open
+
+    def connect(self):
+        self.ser.open()
+
 
 def infer_gauge_label(product_name: str) -> Optional[str]:
     normalized = (product_name or "").strip().upper()
@@ -241,38 +249,10 @@ def discover_gauge_ports(port_candidates=None, timeout=2.0) -> Dict[str, str]:
 
 
 if __name__ == "__main__":
-    discovered_ports = discover_gauge_ports()
-    if not discovered_ports:
-        print("No Inficon gauges detected on available serial ports.")
-    else:
-        for label, port in discovered_ports.items():
-            gauge = PxG55xRS485(port=port, timeout=2.0)
-            try:
-                print(f"============= {label} ({port}) =============")
-                print("Serial number:", gauge.get_serial_number())
-                print("Product name:", gauge.get_product_name())
-                print("Pressure (real):", gauge.get_pressure_real())
-                print("Pressure (fixed):", gauge.get_pressure_fixed())
-            finally:
-                gauge.close()
 
-    continuous_monitoring = True
-    if continuous_monitoring:
-        if not discovered_ports:
-                print("No Inficon gauges detected on available serial ports.")
-        else:
-            try:
-                while True:
-                    for label, port in discovered_ports.items():
-                        gauge = PxG55xRS485(port=port, timeout=2.0)
-                        try:
-                            print(f"============= {label} ({port}) =============")
-                            print("Serial number:", gauge.get_serial_number())
-                            print("Product name:", gauge.get_product_name())
-                            print("Pressure (real):", gauge.get_pressure_real())
-                            print("Pressure (fixed):", gauge.get_pressure_fixed())
-                            time.sleep(10)
-                        finally:
-                            gauge.close()
-            except KeyboardInterrupt:
-                gauge.close()
+    for port in list_ports.comports():
+        if port.serial_number == PSG550_SERIAL_NUMBER:
+            pump_gauge = PxG55xRS485(port=port.device, timeout=2.0)
+        if port.serial_number == PCG550_SERIAL_NUMBER:
+            camera_gauge = PxG55xRS485(port=port.device, timeout=2.0)
+
