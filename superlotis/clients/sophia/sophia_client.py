@@ -1,5 +1,5 @@
 from superlotis.drivers.sophia.sophia import SOPHIA
-from superlotis.tools.constants import SOPHIA_SOCKET_IP_ADDRESS, SOPHIA_SOCKET_PORT, SOPHIA_STATUS_KEYS, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL
+from superlotis.tools.constants import SOPHIA_IMAGE_BASE_NAME, SOPHIA_IMAGE_DIR, SOPHIA_IMAGE_EXTENSION, SOPHIA_SOCKET_IP_ADDRESS, SOPHIA_SOCKET_PORT, SOPHIA_STATUS_KEYS, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL
 from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, UDPServerThread
 import time
 import logging
@@ -88,6 +88,7 @@ def process_command(command):
     elif command.startswith("expose"):
 
         try:
+            hdr = camera.header_populator()
             data = camera.take_exposure()
             print(data[:10])
 
@@ -95,14 +96,17 @@ def process_command(command):
                 "%s: exposure started",
                 DEVICE_ID            
             )
-
+            filename = camera.save_image(data, header=hdr, output_dir=SOPHIA_IMAGE_DIR, base_name=SOPHIA_IMAGE_BASE_NAME, extension=SOPHIA_IMAGE_EXTENSION)
             size = getattr(data, "nbytes", None)
             if size is None:
                 try:
                     size = len(data)
                 except Exception:
                     size = "unknown"
-            return f"Exposure complete ({size} bytes)"
+            return f"Exposure complete ({size} bytes), saved to {filename}"
+
+            
+            
 
         except Exception:
             logger.exception("%s: exposure start failed", DEVICE_ID)
