@@ -11,8 +11,9 @@ import socket
 from typing import Any, Callable
 from email.message import EmailMessage
 import smtplib
+import ssl
 
-from superlotis.tools.constants import ALERT_EMAIL_ADDRESS, ALERT_EMAIL_BODY_BASE, ALERT_EMAIL_SUBJECT_BASE, ALERT_EMAIL_RCV
+from superlotis.tools.constants import ALERT_EMAIL_ADDRESS, ALERT_EMAIL_PASSWORD, ALERT_EMAIL_BODY_BASE, ALERT_EMAIL_SUBJECT_BASE, ALERT_EMAIL_RCV
 
 # =========================================================
 # PARSING SCHEDULER COMMAND LINES
@@ -163,11 +164,12 @@ def send_email_alert(system, error_message):
     msg['Subject'] = ALERT_EMAIL_SUBJECT_BASE + system
     msg['From'] = ALERT_EMAIL_ADDRESS
     msg['To'] = ALERT_EMAIL_RCV
-
+    context = ssl.create_default_context()
     try:
         # Connect to Gmail's secure SMTP server
-        with smtplib.SMTP_SSL('://gmail.com', 465) as server: #
-            server.login("your_gmail_address@gmail.com", "your_16_digit_app_password") #
+        # TODO : setup App Password in Google Account
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+            server.login(ALERT_EMAIL_ADDRESS, ALERT_EMAIL_PASSWORD)
             server.send_message(msg)
             print("Email alert sent successfully!")
     except Exception as e:
@@ -431,11 +433,11 @@ class SchedulerPoller(object):
 
                 decoded = response.decode("utf-8")
 
-                self.logger.info(
-                    "%s: received master data:\n%s",
-                    self.device_id,
-                    decoded
-                )
+                # self.logger.info(
+                #     "%s: received master data:\n%s",
+                #     self.device_id,
+                #     decoded
+                # )
 
                 # Process each returned schedule entry.
                 lines = decoded.strip().splitlines()
@@ -451,12 +453,6 @@ class SchedulerPoller(object):
                     # Ignore lines that do not apply to this device.
                     if parsed is None:
                         continue
-
-                    self.logger.info(
-                        "%s: accepted command '%s'",
-                        self.device_id,
-                        parsed.command
-                    )
 
                     self.scheduler.schedule(parsed, self.process_command)
 
@@ -514,6 +510,12 @@ class CommandScheduler:
                 return
 
             self.scheduled.add(parsed.raw_line)
+
+            self.logger.info(
+                    "%s: accepted command '%s'",
+                    self.device_id,
+                    parsed.command
+            )
 
         thread = threading.Thread(
             target=self._execute_later,
