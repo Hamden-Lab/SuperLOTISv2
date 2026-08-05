@@ -188,8 +188,8 @@ class OutletStatusReporter(DeviceStatusReporter):
 
                 for key in status_dict:
                     if key in SOPHIA_STATUS_KEYS:
-
-                        msg = f"set SOPHIA_{key} {status_dict[key]}"
+                        normalized_key = key.lower().replace(" ", "_")
+                        msg = f"set SOPHIA_{normalized_key} {status_dict[key]}"
 
                         self.client.sendto(
                             msg.encode("utf-8"),
