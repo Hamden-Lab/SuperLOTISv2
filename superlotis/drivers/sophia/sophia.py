@@ -1,5 +1,5 @@
 from pathlib import Path
-import datetime
+from datetime import datetime
 from astropy.io import fits
 import socket
 import json
