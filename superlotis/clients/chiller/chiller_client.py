@@ -94,7 +94,7 @@ def process_command(command):
     # get run state
     # =====================================================
 
-    elif command.startswith("get runstate"):
+    elif command.startswith("get run_state"):
 
         try:
             run_state = chiller.get_run_state()
@@ -214,7 +214,7 @@ def process_command(command):
     # get pump temperature
     # =====================================================
 
-    elif command.startswith("get pump temperature"):
+    elif command.startswith("get pump_temperature"):
 
         try:
             temperature = chiller.get_pump_temperature()

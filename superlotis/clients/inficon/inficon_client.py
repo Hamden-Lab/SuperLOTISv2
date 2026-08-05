@@ -59,25 +59,38 @@ def process_command(command):
     # get pressure
     # =====================================================
 
-    if command.startswith("get pressure "):
+    if command.startswith("get pump_pressure"):
 
         try:
-            gauge = str(command.split()[2])
-            if gauge == 'camera':
-                pressure = camera_gauge.get_pressure_real()
-            if gauge == 'pump':
-                pressure = pump_gauge.get_pressure_real()
+            pressure = pump_gauge.get_pressure_real()
 
             logger.info(
-                "%s: %s pressure = %f",
+                "%s: pump pressure = %f",
                 DEVICE_ID,
-                gauge, pressure
+                pressure
             )
 
-            return f"{gauge} pressure = {pressure:.3e}"
+            return f"pump pressure = {pressure:.3e}"
 
         except Exception:
-            logger.exception("%s: can't read pressure from %s", DEVICE_ID, gauge)
+            logger.exception("%s: can't read pump pressure", DEVICE_ID)
+            return "error"
+
+    elif command.startswith("get camera_pressure"):
+
+        try:
+            pressure = camera_gauge.get_pressure_real()
+
+            logger.info(
+                "%s: camera pressure = %f",
+                DEVICE_ID,
+                pressure
+            )
+
+            return f"camera pressure = {pressure:.3e}"
+
+        except Exception:
+            logger.exception("%s: can't read camera pressure", DEVICE_ID)
             return "error"
 
     return "unknown command"
