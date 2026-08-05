@@ -233,3 +233,5 @@ CCDGAIN
 BINNING
 SHUTTER_STATUS
 IMTYPE : light, dark, bias, flat...
+
++ all the attributes from SOPHIA with cam.get_all_attribute_values()

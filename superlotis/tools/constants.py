@@ -37,12 +37,6 @@ CHILLER_OUTLET = 7
 # The local IP address of the SOPHIA computer
 LYMAN_COMPUTER_IP_ADDRESS = "127.0.0.1"
 
-# PSG550 INFICON Vacuum Gauge
-INFICON_SOCKET_IP_ADDRESS = LYMAN_COMPUTER_IP_ADDRESS
-INFICON_SOCKET_PORT = 5148
-PSG550_SERIAL_NUMBER = "BG01XA1ZA"
-PCG550_SERIAL_NUMBER = "BG02MO5LA"
-
 # Lantronix Filter Wheel
 FILTER_WHEEL_IP_ADDRESS = "140.252.86.88"
 FILTER_WHEEL_PORT = 10001
@@ -59,18 +53,7 @@ SOPHIA_FRAME_TIMEOUT = 10
 SOPHIA_SOCKET_IP_ADDRESS = LYMAN_COMPUTER_IP_ADDRESS
 SOPHIA_SOCKET_PORT = 5145
 SOPHIA_STATUS_KEYS = ['Sensor Temperature Reading']
-# SOPHIA_STATUS_KEYS = ['Active Shutter'
-#                         'Clean Cycle Count',
-#                         'Cooling Fan Status',
-#                         'Disable Cooling Fan',
-#                         'Exposure Time',
-#                         'External Shutter Status',
-#                         'Internal Shutter Status',
-#                         'Online Readout Rate Calculation',
-#                         'Sensor Temperature Reading',
-#                         'Sensor Temperature Set Point',
-#                         'Sensor Temperature Status'
-#                     ]
+SOPHIA_STATUS_KEYS = ['Active Shutter', 'Clean Cycle Count', 'Cooling Fan Status', 'Disable Cooling Fan', 'Exposure Time', 'External Shutter Status', 'Internal Shutter Status', 'Online Readout Rate Calculation', 'Sensor Temperature Reading', 'Sensor Temperature Set Point', 'Sensor Temperature Status']
 
 # CyberPower PDU41001
 PDU41001_IP_ADDRESS = "192.168.1.101" #"192.168.1.101"
@@ -85,3 +68,9 @@ CHILLER_SERIAL_NUMBER = "A90O3CT2A"
 CHILLER_SOCKET_IP_ADDRESS = LYMAN_COMPUTER_IP_ADDRESS
 CHILLER_SOCKET_PORT = 5147
 CHILLER_SERIAL_BAUDRATE = 57600
+
+# PSG550 INFICON Vacuum Gauge
+INFICON_SOCKET_IP_ADDRESS = LYMAN_COMPUTER_IP_ADDRESS
+INFICON_SOCKET_PORT = 5148
+PSG550_SERIAL_NUMBER = "BG01XA1ZA"
+PCG550_SERIAL_NUMBER = "BG02MO5LA"
