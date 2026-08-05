@@ -1,3 +1,6 @@
+from pathlib import Path
+import datetime
+from astropy.io import fits
 import pylablib as pll
 pll.par["devices/dlls/picam"] = r"C:\Program Files\Princeton Instruments\PICam\Runtime"
 from pylablib.devices import PrincetonInstruments
@@ -17,12 +20,32 @@ class SOPHIA(object):
         self.cam = PrincetonInstruments.PicamCamera(SOPHIA_SN)
         print("CONNECTED TO SOPHIA CAMERA")
 
+    def header_populator(self):
+        
+
+    def save_image(self, data, header=None, output_dir="E:/", base_name="sophia_image", extension=".fits" ):
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+    
+            date_str = datetime.now().strftime("%Y%m%d")
+            stem = f"{base_name}_{date_str}"
+    
+            filename = output_dir / f"{stem}{extension}"
+    
+            counter = 1
+            while filename.exists():
+                filename = output_dir / f"{stem}_{counter:03d}{extension}"
+                counter += 1
+    
+            hdu = fits.PrimaryHDU(data=data, header=header)
+            hdu.writeto(filename)
+    
+            return filename
+
     def take_exposure(self):
         data = self.cam.grab(nframes=1, frame_timeout=SOPHIA_FRAME_TIMEOUT)
         return data[0]
 
-    def save_image(self, data, header):
-        pass
     
     def take_bias(self):
         temp_exptime = self.cam.get_attribute_value("Exposure Time")
