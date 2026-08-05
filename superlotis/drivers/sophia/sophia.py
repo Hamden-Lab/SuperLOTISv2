@@ -4,7 +4,15 @@ from pylablib.devices import PrincetonInstruments
 from superlotis.tools.constants import SOPHIA_SN, SOPHIA_FRAME_TIMEOUT
 
 class SOPHIA(object):
-
+    """
+    Class to control SOPHIA camera through pylablib package.
+    Requires to install official picam drivers.
+    Links:
+        - https://github.com/AlexShkarin/pyLabLib/tree/main/pylablib/devices/PrincetonInstruments
+        - https://pylablib.readthedocs.io/en/stable/devices/Picam.html
+        - https://pylablib.readthedocs.io/en/stable/.apidoc/pylablib.devices.PrincetonInstruments.html
+    """
+    
     def __init__(self):
         self.cam = PrincetonInstruments.PicamCamera(SOPHIA_SN)
         print("CONNECTED TO SOPHIA CAMERA")
