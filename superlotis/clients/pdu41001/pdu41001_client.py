@@ -1,6 +1,6 @@
 from superlotis.drivers.pdu41001 import pdu41001
-from superlotis.tools.constants import PDU41001_IP_ADDRESS, PDU41001_USER, PDU41001_PASSWORD, PDU41001_SOCKET_IP_ADDRESS, PDU41001_SOCKET_PORT, PDU41001_NUMBER_OUTLETS, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL
-from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, UDPServerThread
+from superlotis.tools.constants import PDU41001_IP_ADDRESS, PDU41001_USER, PDU41001_PASSWORD, PDU41001_SOCKET_IP_ADDRESS, PDU41001_SOCKET_PORT, PDU41001_NUMBER_OUTLETS, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL, ALERT_INTERVAL_SECONDS
+from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, UDPServerThread, send_email_alert
 import time
 import logging
 from pathlib import Path
@@ -48,6 +48,7 @@ def process_command(command):
     if not pdu.is_open():
         logger.warning("%s: reconnecting SSH", DEVICE_ID)
         pdu.connect()
+        logger.info("Connected")
 
     # =====================================================
     # power on
@@ -183,6 +184,10 @@ class OutletStatusReporter(DeviceStatusReporter):
         encountered during status collection or transmission are logged and
         do not terminate the reporting loop.
         """
+
+        consecutive_failures = 0
+        last_email_alert_time = time.time()
+
         while self._running:
 
             try:
@@ -208,11 +213,61 @@ class OutletStatusReporter(DeviceStatusReporter):
                         self.port
                     )
 
+                power_usage = pdu.get_power_usage()
+                # Get the power in Watt
+                power = float(power_usage['load']['device_load'].split('/')[1].replace('W', '').replace(' ', ''))
+
+                msg = f"set pdu_power {power}"
+                
+                self.client.sendto(
+                    msg.encode("utf-8"),
+                    (self.host, self.port)
+                )
+
+                logger.info(
+                    "%s: sent '%s' to %s:%d",
+                    self.device_id,
+                    msg,
+                    self.host,
+                    self.port
+                )
+
+                consecutive_failures = 0
+                last_email_alert_time = time.time()
+
             except Exception:
                 logger.exception(
                     "%s: outlet status reporting failed",
                     self.device_id
                 )
+
+                try:
+                    if pdu.is_open():
+                        logger.info("Closing connection...")
+                        pdu.close()
+                        logger.info("Connection closed.")
+                except Exception:
+                    logger.info("Attempting reconnect...")
+                    pdu.connect()
+                    logger.info("Reconnect successful.")
+
+                try:
+                    logger.info("Attempting reconnect...")
+                    pdu.connect()
+                    logger.info("Reconnect successful.")
+                    break
+                except Exception:
+                    logger.exception("Reconnect failed.")
+                    time.sleep(5)
+                
+                consecutive_failures += 1
+                
+                if consecutive_failures >= 5:
+                    current_time = time.time()
+                
+                    if consecutive_failures == 5 or (current_time - last_email_alert_time) >= ALERT_INTERVAL_SECONDS:
+                        send_email_alert(DEVICE_ID, f"Reporting failed {consecutive_failures} times in a row. Check the device connection.")
+                        last_email_alert_time = current_time
 
             # Wait before sending the next status update cycle.
             time.sleep(self.interval)
@@ -228,7 +283,9 @@ if __name__ == "__main__":
     # =====================================================
 
     pdu = pdu41001.PDU41001(host=PDU41001_IP_ADDRESS, user=PDU41001_USER, password=PDU41001_PASSWORD)
+    logger.info("Connecting PDU...")
     pdu.connect()
+    logger.info("Connected")
 
     logger.info(
         "%s: device connected",
@@ -268,6 +325,8 @@ if __name__ == "__main__":
             device_socket_server.stop()
             scheduler_poller.stop_polling_scheduler_server()
             status_reporter.stop()
+            logger.info("Closing PDU...")
             pdu.close()
+            logger.info("Closed")
             del pdu
             break
