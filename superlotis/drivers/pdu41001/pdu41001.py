@@ -1,6 +1,8 @@
 import getpass
 import logging
 import re
+import time
+import socket
 from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
 
 import keyring
@@ -39,11 +41,15 @@ class PDU41001(object):
         return [self.password]
 
     def __enter__(self) -> Self:
-        self.connect()
+        logger.info("Connecting to %s...", pdu.host)
+        pdu.connect()
+        logger.info("Connected successfully.")
         return self
 
     def __exit__(self, *_: Any) -> None:
-        self.close()
+        logger.info("Closing connection...")
+        pdu.close()
+        logger.info("Connection closed.")
 
     def connect(self) -> str:
         """Connect to the PDU and return the received welcome banner."""
@@ -76,12 +82,39 @@ class PDU41001(object):
         self.transport = None
         self.channel = None
 
-    def _recv_until(self, delim: str, bufsize: int = DEFAULT_RECV_BUFSIZE) -> str:
+    def _recv_until(self, delim, timeout=5):
         assert self.channel
-        while True:
-            data = self.channel.recv(bufsize).decode()
-            if data.endswith(delim):
-                return data
+
+        end = time.time() + timeout
+        buffer = ""
+
+        while time.time() < end:
+
+            if self.channel.recv_ready():
+                chunk = self.channel.recv(1024)
+
+                if not chunk:
+                    raise ConnectionError("SSH channel closed.")
+
+                buffer += chunk.decode()
+
+                if buffer.endswith(delim):
+                    return buffer
+
+            elif self.channel.closed:
+                raise ConnectionError("SSH channel closed.")
+
+            else:
+                time.sleep(0.1)
+
+        raise TimeoutError("Timed out waiting for PDU response.")
+
+    # def _recv_until(self, delim: str, bufsize: int = DEFAULT_RECV_BUFSIZE) -> str:
+    #     assert self.channel
+    #     while True:
+    #         data = self.channel.recv(bufsize).decode()
+    #         if data.endswith(delim):
+    #             return data
 
     def run(self, cmd: str) -> str:
         """Run a command and return the output.
@@ -256,5 +289,7 @@ class PDU41001(object):
 if __name__ == "__main__":
     print("STARTING PDU")
     pdu = PDU41001(host=PDU41001_IP_ADDRESS, user=PDU41001_USER, password=PDU41001_PASSWORD)
+    logger.info("Connecting to %s...", pdu.host)
     pdu.connect()
+    logger.info("Connected successfully.")
     pdu.get_status()
