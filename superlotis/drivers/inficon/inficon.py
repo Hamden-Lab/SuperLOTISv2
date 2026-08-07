@@ -263,7 +263,9 @@ def discover_gauge_ports(port_candidates=None, timeout=2.0) -> Dict[str, str]:
 if __name__ == "__main__":
 
     for port in list_ports.comports():
+        print(port)
         if port.serial_number == PSG550_SERIAL_NUMBER:
+            print(port)
             pump_gauge = PxG55xRS485(port=port.device)
             pump_gauge.connect()
         if port.serial_number == PCG550_SERIAL_NUMBER:
