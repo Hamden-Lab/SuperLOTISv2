@@ -102,6 +102,9 @@ class SOPHIA(object):
             stem = f"{base_name}_{date_str}"
     
             filename = output_dir / f"{stem}{extension}"
+
+            # print here to see; go take another image and inspect this print in the terminal, it also showed nothing but zeroes there
+            print(data[:10])
     
             counter = 1
             while filename.exists():
@@ -137,7 +140,16 @@ class SOPHIA(object):
         return self.cam.get_attribute_value("Sensor Temperature Reading")
     
     def set_temperature(self, temp_c):
+        # NOTE: keep the get picture in order for the temperature setpoint to take effect (magic)
         self.cam.set_attribute_value("Sensor Temperature Set Point", temp_c) # C
+
+        temp_exptime = self.cam.get_attribute_value("Exposure Time")
+        self.cam.set_attribute_value("Exposure Time", 0) # ms
+        _ = self.cam.grab(nframes=1, frame_timeout=SOPHIA_FRAME_TIMEOUT)
+        self.cam.set_attribute_value("Exposure Time", temp_exptime)
+
+    def get_target_temperature(self):
+        return self.cam.get_attribute_value("Sensor Temperature Set Point")
 
     def get_all_attributes(self):
         # Get all attribute values of the camera (dict that can be stored as FITS headers)
