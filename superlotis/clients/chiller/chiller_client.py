@@ -1,7 +1,7 @@
 from serial.tools import list_ports
 from superlotis.drivers.chiller.chiller import TCubeChiller
-from superlotis.tools.constants import CHILLER_SERIAL_NUMBER, CHILLER_SOCKET_IP_ADDRESS, CHILLER_SOCKET_PORT, CHILLER_SERIAL_BAUDRATE, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL
-from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, UDPServerThread
+from superlotis.tools.constants import CHILLER_SERIAL_NUMBER, CHILLER_SOCKET_IP_ADDRESS, CHILLER_SOCKET_PORT, CHILLER_SERIAL_BAUDRATE, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL, ALERT_INTERVAL_SECONDS
+from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, UDPServerThread, send_email_alert
 import time
 import logging
 from pathlib import Path
@@ -293,6 +293,10 @@ class OutletStatusReporter(DeviceStatusReporter):
         encountered during status collection or transmission are logged and
         do not terminate the reporting loop.
         """
+
+        consecutive_failures = 0
+        last_email_alert_time = time.time()
+
         while self._running:
 
             try:
@@ -313,11 +317,32 @@ class OutletStatusReporter(DeviceStatusReporter):
                         self.port
                     )
 
+                    consecutive_failures = 0
+                    last_email_alert_time = time.time()
+
             except Exception:
                 logger.exception(
                     "%s: chiller status reporting failed",
                     self.device_id
                 )
+
+                try:
+                    chiller.disconnect()
+                    chiller.connect()
+                except Exception:
+                    logger.exception(
+                        "%s: Attempting to reconnect",
+                        self.device_id
+                    )
+
+                consecutive_failures += 1
+
+                if consecutive_failures >= 5:
+                    current_time = time.time()
+
+                    if consecutive_failures == 5 or (current_time - last_email_alert_time) >= ALERT_INTERVAL_SECONDS:
+                        send_email_alert(DEVICE_ID, f"Reporting failed {consecutive_failures} times in a row. Check the device connection.")
+                        last_email_alert_time = current_time
 
             # Wait before sending the next status update cycle.
             time.sleep(self.interval)
