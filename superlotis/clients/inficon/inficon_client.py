@@ -120,6 +120,7 @@ class OutletStatusReporter(DeviceStatusReporter):
         while self._running:
 
             try:
+
                 camera_pressure = camera_gauge.get_pressure_real()
                 pump_pressure = pump_gauge.get_pressure_real()
 
@@ -157,17 +158,31 @@ class OutletStatusReporter(DeviceStatusReporter):
                 last_email_alert_time = time.time()
 
             except Exception:
+
                 logger.exception(
                     "%s: outlet status reporting failed",
                     self.device_id
                 )
+
+                try:
+                    pump_gauge.disconnect()
+                    camera_gauge.disconnect()
+
+                    pump_gauge.connect()
+                    camera_gauge.connect()
+                except Exception:
+                    logger.exception(
+                        "%s: Attempting to reconnect",
+                        self.device_id
+                 )
+
                 consecutive_failures += 1
 
                 if consecutive_failures >= 5:
                     current_time = time.time()
 
                     if consecutive_failures == 5 or (current_time - last_email_alert_time) >= ALERT_INTERVAL_SECONDS:
-                        send_email_alert("Gauges", f"Outlet status reporting failed {consecutive_failures} times in a row. Check the device connection.")
+                        send_email_alert(DEVICE_ID, f"Reporting failed {consecutive_failures} times in a row. Check the device connection.")
                         last_email_alert_time = current_time
 
             # Wait before sending the next status update cycle.
