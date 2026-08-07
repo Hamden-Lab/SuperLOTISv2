@@ -13,7 +13,7 @@ from email.message import EmailMessage
 import smtplib
 import ssl
 
-from superlotis.tools.constants import ALERT_EMAIL_ADDRESS, ALERT_EMAIL_PASSWORD, ALERT_EMAIL_BODY_BASE, ALERT_EMAIL_SUBJECT_BASE, ALERT_EMAIL_RCV
+from superlotis.tools.constants import ALERT_EMAIL_ADDRESS, GOOGLE_APP_PASSWORD, ALERT_EMAIL_BODY_BASE, ALERT_EMAIL_SUBJECT_BASE, ALERT_EMAIL_RCV
 
 # =========================================================
 # PARSING SCHEDULER COMMAND LINES
@@ -169,7 +169,7 @@ def send_email_alert(system, error_message):
         # Connect to Gmail's secure SMTP server
         # TODO : setup App Password in Google Account
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-            server.login(ALERT_EMAIL_ADDRESS, ALERT_EMAIL_PASSWORD)
+            server.login(ALERT_EMAIL_ADDRESS, GOOGLE_APP_PASSWORD)
             server.send_message(msg)
             print("Email alert sent successfully!")
     except Exception as e:
