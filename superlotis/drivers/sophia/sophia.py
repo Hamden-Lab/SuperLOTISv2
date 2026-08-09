@@ -62,7 +62,10 @@ class SOPHIA(object):
         except Exception:
             pass
 
-        # Query SLOTIS status server for all variables
+        # NOTE: KS: bad practice, you can't have code relating to some external capabilities in the driver code.
+        # The driver code should ONLY contain control/command operations with the camera.
+        # Query SLOTIS status server for all variables.
+        # This following block should go in the client code.
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             client.settimeout(2.0)
@@ -115,19 +118,17 @@ class SOPHIA(object):
             hdu.writeto(filename)
     
             return filename
-
-    def take_exposure(self):
-        data = self.cam.grab(nframes=1, frame_timeout=SOPHIA_FRAME_TIMEOUT)
-        return data[0]
-
     
     def take_bias(self):
-        temp_exptime = self.cam.get_attribute_value("Exposure Time")
+
+        self.configure_dark_shutter()
+        
+        old_exptime = self.cam.get_attribute_value("Exposure Time")
 
         self.cam.set_attribute_value("Exposure Time", 0) # ms
         data = self.cam.grab(nframes=1, frame_timeout=SOPHIA_FRAME_TIMEOUT)
 
-        self.cam.set_attribute_value("Exposure Time", temp_exptime) # ms
+        self.cam.set_attribute_value("Exposure Time", old_exptime) # ms
         return data
 
     def get_exptime(self):
@@ -163,6 +164,114 @@ class SOPHIA(object):
 
     def is_open(self):
         return self.cam.is_opened()
+
+    def take_exposure(self, exptime):
+        """
+        Take a light frame with the CS45 shutter open.
+
+        Parameters
+        ----------
+        exptime : float
+            Exposure time in milliseconds.
+
+        Returns
+        -------
+        numpy.ndarray
+            Light image.
+        """
+        self.configure_science_shutter()
+
+        self.cam.set_attribute_value(
+            "Exposure Time",
+            exptime
+        )
+
+        data = self.cam.grab(
+            nframes=1,
+            frame_timeout=SOPHIA_FRAME_TIMEOUT
+        )
+
+        return data[0]
+
+    def take_dark(self, exptime):
+        """
+        Take a dark frame with the CS45 shutter closed.
+
+        The SOPHIA-XO Trigger Out 1 is connected to the VCM-D1
+        Pulse Input. For a dark exposure, OUT 1 is forced LOW
+        so that the normally-closed CS45 shutter remains closed
+        while the CCD integrates.
+
+        Parameters
+        ----------
+        exptime : float
+            Exposure time in milliseconds.
+
+        Returns
+        -------
+        numpy.ndarray
+            Dark image.
+        """
+        self.configure_dark_shutter()
+
+        self.cam.set_attribute_value(
+            "Exposure Time",
+            exptime
+        )
+
+        data = self.cam.grab(
+            nframes=1,
+            frame_timeout=SOPHIA_FRAME_TIMEOUT
+        )
+
+        return data[0]
+
+    def configure_science_shutter(self):
+        """
+        Configure SOPHIA OUT 1 for normal science exposures.
+
+        OUT 1 follows the camera exposure:
+            exposure start -> HIGH
+            exposure end   -> LOW
+
+        Connected to VCM-D1 Pulse Input, this opens the CS45
+        for the duration of the exposure.
+        """
+
+        self.cam.set_attribute_value(
+            "Output Signal",
+            "Exposing"
+        )
+
+        self.cam.set_attribute_value(
+            "Invert Output Signal",
+            False
+        )
+
+
+    def configure_dark_shutter(self):
+        """
+        Configure SOPHIA OUT 1 so that the CS45 remains closed.
+
+        The CS45/VCM-D1 is configured N.C. (normally closed).
+
+        Always High + inverted produces a continuously LOW
+        physical output, so no pulse is sent to the VCM-D1
+        Pulse Input.
+        """
+
+        self.cam.set_attribute_value(
+            "Output Signal",
+            "Always High"
+        )
+
+        self.cam.set_attribute_value(
+            "Invert Output Signal",
+            True
+        )
+
+
+
 
 if __name__ == "__main__":
     sophia = SOPHIA()
