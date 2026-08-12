@@ -38,7 +38,7 @@ class SOPHIA(object):
 
         # Basic instrument/static fields
         try:
-            hdr['INSTRUME'] = ('SuperLOTIS telescope', 'Instrument')
+            hdr['INSTRUMENT'] = ('SuperLOTIS telescope', 'Instrument')
             hdr['CCDNAME'] = ('Princeton Instruments E2V', 'CCD name')
         except Exception:
             pass
@@ -122,7 +122,7 @@ class SOPHIA(object):
     def take_bias(self):
 
         self.configure_dark_shutter()
-        
+
         old_exptime = self.cam.get_attribute_value("Exposure Time")
 
         self.cam.set_attribute_value("Exposure Time", 0) # ms
