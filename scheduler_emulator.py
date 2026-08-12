@@ -50,7 +50,27 @@ data_lock = Lock()
 # data = """now 6 LYMAN CHILLER get temperature
 # now 11 LYMAN CHILLER get pump_temperature"""
 
-data = """now 6 LYMAN CHILLER get backing_temperature"""
+#data = """now 6 LYMAN CHILLER get backing_temperature"""
+
+# data = """now 0 LYMAN PDU poweron 7
+# now 10 LYMAN PDU poweron 1
+# now 30 LYMAN SOPHIA set temperature -10
+# now 60 LYMAN SOPHIA set temperature -40
+# now 120 LYMAN SOPHIA set temperature -80
+# now 130 LYMAN SOPHIA set exptime 0.01
+# now 480 LYMAN SOPHIA expose
+# now 490 LYMAN SOPHIA expose"""
+
+# data = """now 0 LYMAN PDU poweron 7
+# now 30 LYMAN PDU poweroff 2
+# now 35 LYMAN PFEIFFER stop turbo
+# now 40 LYMAN PDU poweron 1
+# now 50 LYMAN SOPHIA set temperature -10
+# now 120 LYMAN SOPHIA set temperature -40
+# now 240 LYMAN SOPHIA set temperature -80"""
+
+data = """now 0 LYMAN PDU poweroff 2
+now 10 LYMAN PFEIFFER """
 
 # =========================================================
 # COMMAND PROCESSING
