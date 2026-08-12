@@ -33,6 +33,7 @@ PUMP_GAUGE_OUTLET = 4
 USB_HUB_OUTLET = 5
 VACUUM_CONTROLLER_OUTLET = 6
 CHILLER_OUTLET = 7
+SHUTTER_OUTLET = 8
 
 # The local IP address of the SOPHIA computer
 LYMAN_COMPUTER_IP_ADDRESS = "127.0.0.1"
@@ -52,7 +53,9 @@ SOPHIA_SN = "X030000923"
 SOPHIA_FRAME_TIMEOUT = 10
 SOPHIA_SOCKET_IP_ADDRESS = LYMAN_COMPUTER_IP_ADDRESS
 SOPHIA_SOCKET_PORT = 5145
-SOPHIA_STATUS_KEYS = ['Sensor Temperature Reading']
+SOPHIA_IMAGE_DIR = "E:\\"
+SOPHIA_IMAGE_BASE_NAME = "sophia_image"
+SOPHIA_IMAGE_EXTENSION = ".fits"
 SOPHIA_STATUS_KEYS = ['Active Shutter', 'Clean Cycle Count', 'Cooling Fan Status', 'Disable Cooling Fan', 'Exposure Time', 'External Shutter Status', 'Internal Shutter Status', 'Online Readout Rate Calculation', 'Sensor Temperature Reading', 'Sensor Temperature Set Point', 'Sensor Temperature Status']
 
 # CyberPower PDU41001
