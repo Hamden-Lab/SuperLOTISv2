@@ -188,6 +188,9 @@ class OutletStatusReporter(DeviceStatusReporter):
         consecutive_failures = 0
         last_email_alert_time = time.time()
 
+        # KS: required to avoid crash when starting client...
+        time.sleep(5)
+
         while self._running:
 
             try:
