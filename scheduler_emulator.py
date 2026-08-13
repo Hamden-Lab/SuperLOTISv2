@@ -69,8 +69,14 @@ data_lock = Lock()
 # now 120 LYMAN SOPHIA set temperature -40
 # now 240 LYMAN SOPHIA set temperature -80"""
 
-data = """now 0 LYMAN PDU poweroff 2
-now 10 LYMAN PFEIFFER """
+# data = """now 0 LYMAN PDU poweroff 2
+# now 100 LYMAN PFEIFFER stop turbo
+# now 1000 LYMAN PFEIFFER stop backing"""
+
+data = """now 0 LYMAN PDU poweron 2
+now 10 LYMAN PDU poweron 1
+now 10 LYMAN CHILLER set temperature 20
+now 20 LYMAN SOPHIA set temperature 0"""
 
 # =========================================================
 # COMMAND PROCESSING
