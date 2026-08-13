@@ -18,6 +18,9 @@ Repo containing code for SuperLOTIS upgrade (SOPHIA camera, Pfeiffer Vacuum Pump
 * typing-extensions
 * keyring
 * astropy
+* influxdb3-python
+* influxdb3 : database for status storage
+* grafana : service for monitoring purposes
 
 ## Create the conda environment from file
 ```
