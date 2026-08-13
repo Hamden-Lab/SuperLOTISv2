@@ -79,3 +79,94 @@ Manufacturer: FTDI
 Product: None
 Location: None
 
+
+
+
+
+
+
+
+
+Questions for Harrison:
+
+1. Does the scheduler receives data from the clients?
+For example, can the scheduler asks to the Pfeiffer pump "get turbo temperature" and then the Pfeiffer pump client server is sending back the info to the scheduler server?
+Or (my guess) is that the scheduler server only sends action commands (like set this, set that) and the "get" do not exist for this communication layer. The "gets" are automatically send to the status server only.
+
+2. Hardware: how will you attach the pump electronic box (with the 3d print) to the structure of the telescope chassis?
+
+3. Did your code managing the saving of the FITS files disappear from the repo? I don't see it in the repo right now.
+Info: 2 additional disks exist on this computer for data storage: SOPHIA_DATA (1TB) + SOPHIA_DATA2 (2TB)
+
+2026-08-06 14:27:57,425 | ERROR | Socket exception: An existing connection was forcibly closed by the remote host (10054)
+
+
+Code to test shutter.
+It works great with NC + remote + cable to Pulse Input (C).
+
+from pylablib.devices import PrincetonInstruments
+
+cam = PrincetonInstruments.PicamCamera(SOPHIA_SN)
+
+# SOPHIA OUT 1 follows the camera exposure
+cam.set_attribute_value(
+    "Output Signal",
+    "Exposing"
+)
+
+cam.set_attribute_value(
+    "Invert Output Signal",
+    False
+)
+
+# 5 second exposure
+cam.set_attribute_value(
+    "Exposure Time",
+    5000
+)
+
+print("Output Signal:",
+      cam.get_attribute_value("Output Signal"))
+
+print("Invert:",
+      cam.get_attribute_value("Invert Output Signal"))
+
+print("\nStarting 5 second exposure...")
+print("Watch the CS45 shutter.")
+
+data = cam.grab(
+    nframes=1,
+    frame_timeout=30000
+)
+
+print("Exposure complete.")
+print("The shutter should now be CLOSED.")
+
+cam.close()
+
+
+
+C:\Users\superlotis>influxdb3 create token --admin
+
+New token created successfully!
+
+Token: apiv3_h6PV8kXTIJMAWsRyzJjfkq-pRNbpwlWBGFYHNpUDvF4JBP68_OF6aNKo-ypz7fYb_1qC90e4jVXBlwISr_DzKw
+HTTP Requests Header: Authorization: Bearer apiv3_h6PV8kXTIJMAWsRyzJjfkq-pRNbpwlWBGFYHNpUDvF4JBP68_OF6aNKo-ypz7fYb_1qC90e4jVXBlwISr_DzKw
+
+IMPORTANT: Store this token securely, as it will not be shown again
+
+C:\Users\superlotis>set INFLUXDB3_AUTH_TOKEN=apiv3_h6PV8kXTIJMAWsRyzJjfkq-pRNbpwlWBGFYHNpUDvF4JBP68_OF6aNKo-ypz7fYb_1qC90e4jVXBlwISr_DzKw
+
+C:\Users\superlotis>echo %INFLUXDB3_AUTH_TOKEN%
+apiv3_h6PV8kXTIJMAWsRyzJjfkq-pRNbpwlWBGFYHNpUDvF4JBP68_OF6aNKo-ypz7fYb_1qC90e4jVXBlwISr_DzKw
+
+C:\Users\superlotis>influxdb3 create database lyman
+Database "lyman" created successfully
+
+
+[Environment]::SetEnvironmentVariable(
+    "Path",
+    [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\InfluxDB3",
+    "User"
+)
+
