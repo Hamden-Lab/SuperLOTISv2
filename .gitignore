@@ -222,4 +222,6 @@ logs/
 *.csv
 
 # Solidworks
-[~][$]*
+[~][$]*.sldprt
+[~][$]*.sldasm
+[~][$]*.slddrw
