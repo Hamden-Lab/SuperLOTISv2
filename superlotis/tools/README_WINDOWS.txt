@@ -163,10 +163,13 @@ apiv3_h6PV8kXTIJMAWsRyzJjfkq-pRNbpwlWBGFYHNpUDvF4JBP68_OF6aNKo-ypz7fYb_1qC90e4jV
 C:\Users\superlotis>influxdb3 create database lyman
 Database "lyman" created successfully
 
-
+# Add InfluxDB3 service executables to the path
 [Environment]::SetEnvironmentVariable(
     "Path",
     [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\InfluxDB3",
     "User"
 )
+
+# Start the InfluxDB3 database
+influxdb3
 
