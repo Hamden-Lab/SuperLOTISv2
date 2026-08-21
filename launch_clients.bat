@@ -19,5 +19,7 @@ wt --title "Camera" --tabColor "#00ccff" --suppressApplicationTitle cmd /k "%sup
 
 ; nt --title "test_status" --tabColor "#000000" --suppressApplicationTitle cmd /k "%superlotis% && cd /d %RootDir% && ipython -i -c "%%run status_server_emulator.py" " ^
 
+; nt --title "influxdb3" --tabColor "#000000" --suppressApplicationTitle cmd /k "%superlotis% && cd /d %RootDir% && influxdb3 " ^
+
 ; nt --title "status_monitoring" --tabColor "#000000" --suppressApplicationTitle cmd /k "%superlotis% && cd /d %RootDir% && ipython -i -c "%%run status_monitoring.py" " 
 
