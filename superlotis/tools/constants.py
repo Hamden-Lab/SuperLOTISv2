@@ -80,6 +80,7 @@ PCG550_SERIAL_NUMBER = "BG02MO5LA"
 
 GOOGLE_APP_PASSWORD = "bslhdcmbuofoqsga"
 
+# InfluxDB3 database connection properties
 INFLUXDB_HOST = "http://127.0.0.1:8181"
 INFLUXDB_DATABASE = "lyman"
 INFLUXDB_TOKEN = "apiv3_h6PV8kXTIJMAWsRyzJjfkq-pRNbpwlWBGFYHNpUDvF4JBP68_OF6aNKo-ypz7fYb_1qC90e4jVXBlwISr_DzKw"
