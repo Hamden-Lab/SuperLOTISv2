@@ -129,7 +129,7 @@ class SOPHIA(object):
         data = self.cam.grab(nframes=1, frame_timeout=SOPHIA_FRAME_TIMEOUT)
 
         self.cam.set_attribute_value("Exposure Time", old_exptime) # ms
-        return data
+        return data[0]
 
     def get_exptime(self):
         return self.cam.get_attribute_value("Exposure Time")
