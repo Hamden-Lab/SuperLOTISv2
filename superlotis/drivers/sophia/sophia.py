@@ -107,7 +107,7 @@ class SOPHIA(object):
             filename = output_dir / f"{stem}{extension}"
 
             # print here to see; go take another image and inspect this print in the terminal, it also showed nothing but zeroes there
-            print(data[:10])
+            # print(data[:10])
     
             counter = 1
             while filename.exists():
@@ -214,7 +214,8 @@ class SOPHIA(object):
         """
         self.configure_dark_shutter()
 
-        self.cam.set_attribute_value(
+        if exptime:
+            self.cam.set_attribute_value(
             "Exposure Time",
             exptime
         )
