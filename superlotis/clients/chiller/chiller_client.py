@@ -1,7 +1,7 @@
 from serial.tools import list_ports
 from superlotis.drivers.chiller.chiller import TCubeChiller
-from superlotis.tools.constants import CHILLER_SERIAL_NUMBER, CHILLER_SOCKET_IP_ADDRESS, CHILLER_SOCKET_PORT, CHILLER_SERIAL_BAUDRATE, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL, ALERT_INTERVAL_SECONDS
-from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, UDPServerThread, send_email_alert
+from superlotis.tools.constants import CHILLER_SERIAL_NUMBER, CHILLER_SOCKET_IP_ADDRESS, CHILLER_SOCKET_PORT, CHILLER_SERIAL_BAUDRATE, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL, ALERT_INTERVAL_SECONDS, SLOTIS_SCHEDULER_IP_ADDRESS, SLOTIS_SCHEDULER_PORT, SLOTIS_STATUS_SERVER_IP_ADDRESS, SLOTIS_STATUS_SERVER_PORT
+from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, TCPServerThread, send_email_alert
 import time
 import logging
 from pathlib import Path
@@ -300,16 +300,16 @@ class OutletStatusReporter(DeviceStatusReporter):
         while self._running:
 
             try:
+                if self.client is None:
+                    self._connect()
+
                 all_status = chiller.get_all()
                 for key in all_status:
-                    msg = f"set chiller_{key} {all_status[key]}"
+                    msg = f"set chiller_{key} {all_status[key]}\n"
 
-                    self.client.sendto(
-                        msg.encode("utf-8"),
-                        (self.host, self.port)
-                    )
+                    self._send(msg)
 
-                    logger.info(
+                    self.logger.info(
                         "%s: sent '%s' to %s:%d",
                         self.device_id,
                         msg,
@@ -320,29 +320,34 @@ class OutletStatusReporter(DeviceStatusReporter):
                     consecutive_failures = 0
                     last_email_alert_time = time.time()
 
+                    time.sleep(0.1)
+
             except Exception:
-                logger.exception(
+                self.logger.exception(
                     "%s: chiller status reporting failed",
                     self.device_id
                 )
 
-                try:
-                    chiller.disconnect()
-                    chiller.connect()
-                except Exception:
-                    logger.exception(
-                        "%s: Attempting to reconnect",
-                        self.device_id
-                    )
+                # Force a reconnect on the next iteration.
+                self._close_connection()
 
-                consecutive_failures += 1
+                # try:
+                #     chiller.disconnect()
+                #     chiller.connect()
+                # except Exception:
+                #     logger.exception(
+                #         "%s: Attempting to reconnect",
+                #         self.device_id
+                #     )
 
-                if consecutive_failures >= 5:
-                    current_time = time.time()
+                # consecutive_failures += 1
 
-                    if consecutive_failures == 5 or (current_time - last_email_alert_time) >= ALERT_INTERVAL_SECONDS:
-                        send_email_alert(DEVICE_ID, f"Reporting failed {consecutive_failures} times in a row. Check the device connection.")
-                        last_email_alert_time = current_time
+                # if consecutive_failures >= 5:
+                #     current_time = time.time()
+
+                #     if consecutive_failures == 5 or (current_time - last_email_alert_time) >= ALERT_INTERVAL_SECONDS:
+                #         send_email_alert(DEVICE_ID, f"Reporting failed {consecutive_failures} times in a row. Check the device connection.")
+                #         last_email_alert_time = current_time
 
             # Wait before sending the next status update cycle.
             time.sleep(self.interval)
@@ -371,7 +376,7 @@ if __name__ == "__main__":
     # START DEVICE SOCKET SERVER THREAD
     # =====================================================
 
-    device_socket_server = UDPServerThread(host=DEVICE_SERVER_HOST, port=DEVICE_SERVER_PORT, logger=logger, process_command=process_command, device_id=DEVICE_ID)
+    device_socket_server = TCPServerThread(host=DEVICE_SERVER_HOST, port=DEVICE_SERVER_PORT, logger=logger, process_command=process_command, device_id=DEVICE_ID)
     device_socket_server.start()
 
     # =====================================================
@@ -379,14 +384,14 @@ if __name__ == "__main__":
     # =====================================================
 
     scheduler = CommandScheduler(logger=logger, device_id=DEVICE_ID)
-    scheduler_poller = SchedulerPoller(host=TEST_SCHEDULER_SERVER_HOST, port=TEST_SCHEDULER_SERVER_PORT, scheduler=scheduler, logger=logger, process_command=process_command, computer_id=COMPUTER_ID, device_id=DEVICE_ID, timeout=5, poll_interval=SLOTIS_SCHEDULER_POLL_INTERVAL)
+    scheduler_poller = SchedulerPoller(host=SLOTIS_SCHEDULER_IP_ADDRESS, port=SLOTIS_SCHEDULER_PORT, scheduler=scheduler, logger=logger, process_command=process_command, computer_id=COMPUTER_ID, device_id=DEVICE_ID, timeout=5, poll_interval=SLOTIS_SCHEDULER_POLL_INTERVAL)
     scheduler_poller.start_polling_scheduler_server()
 
     # =====================================================
     # START OUTLET STATUS REPORTER THREAD
     # =====================================================
 
-    status_reporter = OutletStatusReporter(host=TEST_STATUS_SERVER_HOST, port=TEST_STATUS_SERVER_PORT, logger=logger, device_id=DEVICE_ID, interval=SLOTIS_STATUS_POLL_INTERVAL)
+    status_reporter = OutletStatusReporter(host=SLOTIS_STATUS_SERVER_IP_ADDRESS, port=SLOTIS_STATUS_SERVER_PORT, logger=logger, device_id=DEVICE_ID, interval=SLOTIS_STATUS_POLL_INTERVAL)
     status_reporter.start()
 
     # =====================================================

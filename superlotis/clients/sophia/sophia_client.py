@@ -1,6 +1,6 @@
 from superlotis.drivers.sophia.sophia import SOPHIA
-from superlotis.tools.constants import SOPHIA_IMAGE_BASE_NAME, SOPHIA_IMAGE_DIR, SOPHIA_IMAGE_EXTENSION, SOPHIA_SOCKET_IP_ADDRESS, SOPHIA_SOCKET_PORT, SOPHIA_STATUS_KEYS, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL
-from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, UDPServerThread
+from superlotis.tools.constants import SOPHIA_IMAGE_BASE_NAME, SOPHIA_IMAGE_DIR, SOPHIA_IMAGE_EXTENSION, SOPHIA_SOCKET_IP_ADDRESS, SOPHIA_SOCKET_PORT, SOPHIA_STATUS_KEYS, TEST_STATUS_SERVER_HOST, TEST_STATUS_SERVER_PORT, TEST_SCHEDULER_SERVER_HOST, TEST_SCHEDULER_SERVER_PORT, SLOTIS_SCHEDULER_POLL_INTERVAL, SLOTIS_STATUS_POLL_INTERVAL, SLOTIS_SCHEDULER_IP_ADDRESS, SLOTIS_SCHEDULER_PORT, SLOTIS_STATUS_SERVER_IP_ADDRESS, SLOTIS_STATUS_SERVER_PORT
+from superlotis.tools.utilities import DeviceStatusReporter, CommandScheduler, SchedulerPoller, TCPServerThread
 import time
 import logging
 from pathlib import Path
@@ -90,7 +90,7 @@ def process_command(command):
         try:
             hdr = camera.header_populator()
             data = camera.take_exposure()
-            print(data[:10])
+            # print(data[:10])
 
             logger.info(
                 "%s: exposure started",
@@ -111,6 +111,60 @@ def process_command(command):
         except Exception:
             logger.exception("%s: exposure start failed", DEVICE_ID)
             return "error"
+
+    elif command.startswith("take bias"):
+    
+            try:
+                hdr = camera.header_populator()
+                data = camera.take_bias()
+                # print(data[:10])
+    
+                logger.info(
+                    "%s: exposure started",
+                    DEVICE_ID            
+                )
+                filename = camera.save_image(data, header=hdr, output_dir=SOPHIA_IMAGE_DIR, base_name=f"BIAS_{SOPHIA_IMAGE_BASE_NAME}", extension=SOPHIA_IMAGE_EXTENSION)
+                size = getattr(data, "nbytes", None)
+                if size is None:
+                    try:
+                        size = len(data)
+                    except Exception:
+                        size = "unknown"
+                return f"Bias complete ({size} bytes), saved to {filename}"
+    
+                
+                
+    
+            except Exception:
+                logger.exception("%s: exposure start failed", DEVICE_ID)
+                return "error"
+
+    elif command.startswith("take dark"):
+    
+            try:
+                hdr = camera.header_populator()
+                data = camera.take_dark()
+                # print(data[:10])
+    
+                logger.info(
+                    "%s: exposure started",
+                    DEVICE_ID            
+                )
+                filename = camera.save_image(data, header=hdr, output_dir=SOPHIA_IMAGE_DIR, base_name=f"DARK_{SOPHIA_IMAGE_BASE_NAME}", extension=SOPHIA_IMAGE_EXTENSION)
+                size = getattr(data, "nbytes", None)
+                if size is None:
+                    try:
+                        size = len(data)
+                    except Exception:
+                        size = "unknown"
+                return f"Exposure complete ({size} bytes), saved to {filename}"
+    
+                
+                
+    
+            except Exception:
+                logger.exception("%s: exposure start failed", DEVICE_ID)
+                return "error"
 
     elif command.startswith("get all"):
 
@@ -173,34 +227,29 @@ def process_command(command):
 
 class OutletStatusReporter(DeviceStatusReporter):
 
-    """Inherits from generic DeviceStatusReporter class defined in superlotis.tools.utilities"""
+    """Reports outlet status information over TCP."""
 
     def report_loop(self):
         """
         Continuously report device status information.
-
-        Polls the status of each device, formats the corresponding status
-        message, and sends it to the configured UDP endpoint. Any errors
-        encountered during status collection or transmission are logged and
-        do not terminate the reporting loop.
         """
+
         while self._running:
 
             try:
+                if self.client is None:
+                    self._connect()
 
                 status_dict = camera.get_all_attributes()
 
                 for key in status_dict:
                     if key in SOPHIA_STATUS_KEYS:
                         normalized_key = key.lower().replace(" ", "_")
-                        msg = f"set SOPHIA_{normalized_key} {status_dict[key]}"
+                        msg = f"set SOPHIA_{normalized_key} {status_dict[key]}\n"
 
-                        self.client.sendto(
-                            msg.encode("utf-8"),
-                            (self.host, self.port)
-                        )
+                        self._send(msg)
 
-                        logger.info(
+                        self.logger.info(
                             "%s: sent '%s' to %s:%d",
                             self.device_id,
                             msg,
@@ -208,14 +257,20 @@ class OutletStatusReporter(DeviceStatusReporter):
                             self.port
                         )
 
+                    time.sleep(0.1)
+
             except Exception:
-                logger.exception(
+                self.logger.exception(
                     "%s: outlet status reporting failed",
                     self.device_id
                 )
 
+                # Force a reconnect on the next iteration.
+                self._close_connection()
+
             # Wait before sending the next status update cycle.
             time.sleep(self.interval)
+
 
 # =========================================================
 # MAIN
@@ -238,7 +293,7 @@ if __name__ == "__main__":
     # START DEVICE SOCKET SERVER THREAD
     # =====================================================
 
-    device_socket_server = UDPServerThread(host=DEVICE_SERVER_HOST, port=DEVICE_SERVER_PORT, logger=logger, process_command=process_command, device_id=DEVICE_ID)
+    device_socket_server = TCPServerThread(host=DEVICE_SERVER_HOST, port=DEVICE_SERVER_PORT, logger=logger, process_command=process_command, device_id=DEVICE_ID)
     device_socket_server.start()
 
     # =====================================================
@@ -246,14 +301,14 @@ if __name__ == "__main__":
     # =====================================================
 
     scheduler = CommandScheduler(logger=logger, device_id=DEVICE_ID)
-    scheduler_poller = SchedulerPoller(host=TEST_SCHEDULER_SERVER_HOST, port=TEST_SCHEDULER_SERVER_PORT, scheduler=scheduler, logger=logger, process_command=process_command, computer_id=COMPUTER_ID, device_id=DEVICE_ID, timeout=5, poll_interval=SLOTIS_SCHEDULER_POLL_INTERVAL)
+    scheduler_poller = SchedulerPoller(host=SLOTIS_SCHEDULER_IP_ADDRESS, port=SLOTIS_SCHEDULER_PORT, scheduler=scheduler, logger=logger, process_command=process_command, computer_id=COMPUTER_ID, device_id=DEVICE_ID, timeout=5, poll_interval=SLOTIS_SCHEDULER_POLL_INTERVAL)
     scheduler_poller.start_polling_scheduler_server()
 
     # =====================================================
     # START OUTLET STATUS REPORTER THREAD
     # =====================================================
 
-    status_reporter = OutletStatusReporter(host=TEST_STATUS_SERVER_HOST, port=TEST_STATUS_SERVER_PORT, logger=logger, device_id=DEVICE_ID, interval=SLOTIS_STATUS_POLL_INTERVAL)
+    status_reporter = OutletStatusReporter(host=SLOTIS_STATUS_SERVER_IP_ADDRESS, port=SLOTIS_STATUS_SERVER_PORT, logger=logger, device_id=DEVICE_ID, interval=SLOTIS_STATUS_POLL_INTERVAL)
     status_reporter.start()
 
     # =====================================================
