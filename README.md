@@ -238,3 +238,10 @@ SHUTTER_STATUS
 IMTYPE : light, dark, bias, flat...
 
 + all the attributes from SOPHIA with cam.get_all_attribute_values()
+
+
+
+
+## Forward status and scheduler ports
+
+ssh -L 5134:localhost:5134 -L 5135:localhost:5135 slotis@slotis.kpno.noirlab.edu
