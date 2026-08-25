@@ -75,6 +75,23 @@ DATE_REGEX = re.compile(
     re.VERBOSE,
 )
 
+# Matches:
+# 1756155300 SLOTIS PDU poweroff 2
+UNIX_REGEX = re.compile(
+    r"""
+    ^
+    (?P<timestamp>\d+)
+    \s+
+    (?P<computer_id>\S+)
+    \s+
+    (?P<device_id>\S+)
+    \s+
+    (?P<command>.+)
+    $
+    """,
+    re.VERBOSE,
+)
+
 def parse_schedule_line(line: str, computer_id: str, device_id: str) -> Optional[ParsedCommand]:
 
     line = line.strip()
@@ -156,6 +173,35 @@ def parse_schedule_line(line: str, computer_id: str, device_id: str) -> Optional
             command=match.group("command"),
         )
 
+    # =====================================================
+    # UNIX TIMESTAMP FORMAT
+    # =====================================================
+
+    match = UNIX_REGEX.match(line)
+
+    if match:
+        parsed_computer_id = match.group("computer_id")
+        parsed_device_id = match.group("device_id")
+
+        if (
+            parsed_computer_id != computer_id
+            or parsed_device_id != device_id
+        ):
+            return None
+
+        timestamp = int(match.group("timestamp"))
+        # offset = int(match.group("offset"))
+
+        execute_at = timestamp #+ offset
+
+        return ParsedCommand(
+            raw_line=line,
+            execute_at=execute_at,
+            computer_id=parsed_computer_id,
+            device_id=parsed_device_id,
+            command=match.group("command"),
+        )
+
     return None
 
 def send_email_alert(system, error_message):
@@ -179,13 +225,12 @@ def send_email_alert(system, error_message):
 # =========================================================
 # LOCAL UDP SOCKET SERVER HANDLER
 # =========================================================
-
-class MyUDPHandler(socketserver.BaseRequestHandler):
+class MyTCPHandler(socketserver.BaseRequestHandler):
     """
-    Handle incoming UDP socket requests.
+    Handle incoming TCP socket requests.
 
-    Receives a command from a UDP client, processes it, and returns the
-    command result to the sender. Any processing errors are logged and
+    Receives a command from a TCP client, processes it, and returns the
+    command result to the client. Any processing errors are logged and
     result in a generic error response.
     """
 
@@ -195,6 +240,7 @@ class MyUDPHandler(socketserver.BaseRequestHandler):
 
         Args:
             logger: Logger instance used for request and error logging.
+            process_command: Function used to process received commands.
         """
         self.logger = logger
         self.process_command = process_command
@@ -202,28 +248,31 @@ class MyUDPHandler(socketserver.BaseRequestHandler):
 
     def handle(self):
         """
-        Process a single UDP request.
+        Process commands received over the TCP connection.
 
-        The incoming datagram is decoded as UTF-8, passed to the command
-        processor, and the resulting response is sent back to the client.
-        If command processing fails, an error message is returned instead.
+        TCP is a byte stream, so the connection is read until the client
+        closes it. Commands are expected to be newline-delimited.
         """
-        data = self.request[0].strip()
-        sock = self.request[1]
-
-        command = data.decode("utf-8", errors="replace")
-
-        self.logger.info(
-            "received local socket command '%s'",
-            command
-        )
-
         try:
+            data = self.request.recv(8192)
+
+            if not data:
+                return
+
+            command = data.decode(
+                "utf-8",
+                errors="replace"
+            ).strip()
+
+            self.logger.info(
+                "received local socket command '%s'",
+                command
+            )
+
             result = self.process_command(command)
 
-            sock.sendto(
-                result.encode("utf-8"),
-                self.client_address
+            self.request.sendall(
+                result.encode("utf-8")
             )
 
         except Exception:
@@ -231,32 +280,97 @@ class MyUDPHandler(socketserver.BaseRequestHandler):
                 "socket request failed"
             )
 
-            sock.sendto(
-                b"internal server error",
-                self.client_address
-            )
+            try:
+                self.request.sendall(
+                    b"internal server error"
+                )
+            except Exception:
+                self.logger.exception(
+                    "failed to send error response"
+                )
+
+
+
+# class MyUDPHandler(socketserver.BaseRequestHandler):
+#     """
+#     Handle incoming UDP socket requests.
+
+#     Receives a command from a UDP client, processes it, and returns the
+#     command result to the sender. Any processing errors are logged and
+#     result in a generic error response.
+#     """
+
+#     def __init__(self, *args, logger, process_command, **kwargs):
+#         """
+#         Initialize the request handler.
+
+#         Args:
+#             logger: Logger instance used for request and error logging.
+#         """
+#         self.logger = logger
+#         self.process_command = process_command
+#         super().__init__(*args, **kwargs)
+
+#     def handle(self):
+#         """
+#         Process a single UDP request.
+
+#         The incoming datagram is decoded as UTF-8, passed to the command
+#         processor, and the resulting response is sent back to the client.
+#         If command processing fails, an error message is returned instead.
+#         """
+#         data = self.request[0].strip()
+#         sock = self.request[1]
+
+#         command = data.decode("utf-8", errors="replace")
+
+#         self.logger.info(
+#             "received local socket command '%s'",
+#             command
+#         )
+
+#         try:
+#             result = self.process_command(command)
+
+#             sock.sendto(
+#                 result.encode("utf-8"),
+#                 self.client_address
+#             )
+
+#         except Exception:
+#             self.logger.exception(
+#                 "socket request failed"
+#             )
+
+#             sock.sendto(
+#                 b"internal server error",
+#                 self.client_address
+#             )
 
 
 # =========================================================
 # LOCAL UDP SOCKET SERVER THREAD
 # =========================================================
 
-class UDPServerThread:
+class TCPServerThread:
     """
-    Run a UDP server in a dedicated background thread.
+    Run a TCP server in a dedicated background thread.
 
     This class manages the lifecycle of a
-    ``socketserver.ThreadingUDPServer`` instance, providing methods to
+    ``socketserver.ThreadingTCPServer`` instance, providing methods to
     start and stop the server cleanly.
     """
 
     def __init__(self, host, port, logger, process_command, device_id):
         """
-        Initialize the UDP server and its worker thread.
+        Initialize the TCP server and its worker thread.
 
         Args:
             host: Host address to bind the server to.
-            port: UDP port to listen on.
+            port: TCP port to listen on.
+            logger: Logger instance.
+            process_command: Function used to process commands.
+            device_id: Identifier for the device.
         """
         self.host = host
         self.port = port
@@ -264,11 +378,12 @@ class UDPServerThread:
         self.device_id = device_id
 
         self.handler_class = partial(
-            MyUDPHandler,
-            logger=logger, process_command=process_command
+            MyTCPHandler,
+            logger=logger,
+            process_command=process_command
         )
 
-        self.server = socketserver.ThreadingUDPServer(
+        self.server = socketserver.ThreadingTCPServer(
             (self.host, self.port),
             self.handler_class
         )
@@ -280,13 +395,10 @@ class UDPServerThread:
 
     def start(self):
         """
-        Start the UDP server in a background thread.
-
-        Logs the server endpoint and begins processing incoming UDP
-        requests.
+        Start the TCP server in a background thread.
         """
         self.logger.warning(
-            "%s: local UDP server started on %s:%s",
+            "%s: local TCP server started on %s:%s",
             self.device_id,
             self.host,
             self.port
@@ -296,29 +408,102 @@ class UDPServerThread:
 
     def stop(self):
         """
-        Stop the UDP server and wait for the worker thread to exit.
-
-        Shuts down the server loop, closes the underlying socket, and
-        blocks until the server thread has terminated.
+        Stop the TCP server and wait for the worker thread to exit.
         """
         self.logger.warning(
-            "%s: stopping UDP server",
+            "%s: stopping TCP server",
             self.device_id
         )
 
-        # Stop the server loop accepting new requests.
         self.server.shutdown()
-
-        # Release the bound UDP socket.
         self.server.server_close()
-
-        # Wait for the server thread to terminate.
         self.thread.join()
 
         self.logger.warning(
-            "%s: UDP server stopped",
+            "%s: TCP server stopped",
             self.device_id
         )
+
+
+
+# class UDPServerThread:
+#     """
+#     Run a UDP server in a dedicated background thread.
+
+#     This class manages the lifecycle of a
+#     ``socketserver.ThreadingUDPServer`` instance, providing methods to
+#     start and stop the server cleanly.
+#     """
+
+#     def __init__(self, host, port, logger, process_command, device_id):
+#         """
+#         Initialize the UDP server and its worker thread.
+
+#         Args:
+#             host: Host address to bind the server to.
+#             port: UDP port to listen on.
+#         """
+#         self.host = host
+#         self.port = port
+#         self.logger = logger
+#         self.device_id = device_id
+
+#         self.handler_class = partial(
+#             MyUDPHandler,
+#             logger=logger, process_command=process_command
+#         )
+
+#         self.server = socketserver.ThreadingUDPServer(
+#             (self.host, self.port),
+#             self.handler_class
+#         )
+
+#         self.thread = threading.Thread(
+#             target=self.server.serve_forever,
+#             daemon=True
+#         )
+
+#     def start(self):
+#         """
+#         Start the UDP server in a background thread.
+
+#         Logs the server endpoint and begins processing incoming UDP
+#         requests.
+#         """
+#         self.logger.warning(
+#             "%s: local UDP server started on %s:%s",
+#             self.device_id,
+#             self.host,
+#             self.port
+#         )
+
+#         self.thread.start()
+
+#     def stop(self):
+#         """
+#         Stop the UDP server and wait for the worker thread to exit.
+
+#         Shuts down the server loop, closes the underlying socket, and
+#         blocks until the server thread has terminated.
+#         """
+#         self.logger.warning(
+#             "%s: stopping UDP server",
+#             self.device_id
+#         )
+
+#         # Stop the server loop accepting new requests.
+#         self.server.shutdown()
+
+#         # Release the bound UDP socket.
+#         self.server.server_close()
+
+#         # Wait for the server thread to terminate.
+#         self.thread.join()
+
+#         self.logger.warning(
+#             "%s: UDP server stopped",
+#             self.device_id
+#         )
 
 
 # =========================================================
@@ -330,7 +515,7 @@ class SchedulerPoller(object):
     Poll a remote scheduler server for scheduled commands.
 
     This class periodically requests command schedules from a master
-    scheduler over UDP, parses the returned schedule entries, and submits
+    scheduler over TCP, parses the returned schedule entries, and submits
     accepted commands to a local ``CommandScheduler`` instance.
     """
 
@@ -340,7 +525,7 @@ class SchedulerPoller(object):
         port,
         scheduler,
         logger,
-        process_command: Callable[[], Any], #function
+        process_command: Callable[[], Any],
         computer_id,
         device_id,
         timeout=5,
@@ -351,7 +536,7 @@ class SchedulerPoller(object):
 
         Args:
             host: Hostname or IP address of the scheduler server.
-            port: UDP port of the scheduler server.
+            port: TCP port of the scheduler server.
             scheduler: Local scheduler used to queue accepted commands.
             timeout: Socket timeout in seconds.
             poll_interval: Delay between polling attempts in seconds.
@@ -363,29 +548,27 @@ class SchedulerPoller(object):
         self.process_command = process_command
         self.computer_id = computer_id
         self.device_id = device_id
-    
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
         self.timeout = timeout
         self.poll_interval = poll_interval
+
+        self._polling_scheduler_server = False
+        self.poll_scheduler_server_thread = None
 
         self.logger.warning(
             "%s: starting master polling thread",
             self.device_id
         )
 
-        self.client.settimeout(self.timeout)
-
     def start_polling_scheduler_server(self):
         """
         Start the scheduler polling thread.
-
-        The polling thread periodically contacts the remote scheduler
-        server and processes any returned schedule entries.
         """
         self._polling_scheduler_server = True
 
         self.poll_scheduler_server_thread = threading.Thread(
-            target=self.poll_scheduler
+            target=self.poll_scheduler,
+            daemon=True
         )
 
         self.poll_scheduler_server_thread.start()
@@ -398,13 +581,11 @@ class SchedulerPoller(object):
     def stop_polling_scheduler_server(self):
         """
         Stop the scheduler polling thread.
-
-        Signals the polling loop to exit and waits for the polling thread
-        to terminate.
         """
         self._polling_scheduler_server = False
 
-        self.poll_scheduler_server_thread.join()
+        if self.poll_scheduler_server_thread is not None:
+            self.poll_scheduler_server_thread.join()
 
         self.logger.warning(
             "%s: STOP SCHEDULER SERVER POLLING THREAD",
@@ -415,34 +596,67 @@ class SchedulerPoller(object):
         """
         Continuously poll the remote scheduler server.
 
-        Requests the current schedule, parses each returned schedule line,
-        and submits valid commands to the configured scheduler. Any polling
-        or parsing errors are logged and do not terminate the polling loop.
+        Each polling cycle establishes a TCP connection, requests the
+        current schedule, receives the response, and closes the connection.
         """
+
         while self._polling_scheduler_server:
 
+            client = None
+
             try:
-                # Request all scheduled commands from the master server.
-                self.client.sendto(
-                    b"/all",
+                # Create a new TCP connection for this polling cycle.
+                client = socket.socket(
+                    socket.AF_INET,
+                    socket.SOCK_STREAM
+                )
+
+                client.settimeout(self.timeout)
+
+                client.connect(
                     (self.host, self.port)
                 )
 
+                # Request all scheduled commands from the master server.
+                client.sendall(
+                    b"all\n"
+                )
+
                 # Receive the scheduler response payload.
-                response, _ = self.client.recvfrom(8192)
+                response = client.recv(2*8192)
+
+
+                # # NOTE: dangerous chatgpt edit
+                # chunks = []
+
+                # while True:
+                #     chunk = client.recv(8192)
+
+                #     if not chunk:
+                #         break
+
+                #     chunks.append(chunk)
+
+                # response = b"".join(chunks)
+
+                # # End of it
+
+                if not response:
+                    raise ConnectionError(
+                        "scheduler server closed the connection"
+                    )
 
                 decoded = response.decode("utf-8")
-
-                # self.logger.info(
-                #     "%s: received master data:\n%s",
-                #     self.device_id,
-                #     decoded
-                # )
 
                 # Process each returned schedule entry.
                 lines = decoded.strip().splitlines()
 
                 for line in lines:
+
+                    self.logger.info(
+                        "%s: received : %s",
+                        self.device_id, line
+                    )
 
                     parsed = parse_schedule_line(
                         line=line,
@@ -454,7 +668,10 @@ class SchedulerPoller(object):
                     if parsed is None:
                         continue
 
-                    self.scheduler.schedule(parsed, self.process_command)
+                    self.scheduler.schedule(
+                        parsed,
+                        self.process_command
+                    )
 
             except Exception:
                 self.logger.exception(
@@ -462,8 +679,159 @@ class SchedulerPoller(object):
                     self.device_id
                 )
 
+            finally:
+                if client is not None:
+                    try:
+                        client.close()
+                    except Exception:
+                        self.logger.exception(
+                            "%s: failed to close scheduler TCP connection",
+                            self.device_id
+                        )
+
             # Wait before the next polling cycle.
             time.sleep(self.poll_interval)
+
+
+# class SchedulerPoller(object):
+#     """
+#     Poll a remote scheduler server for scheduled commands.
+
+#     This class periodically requests command schedules from a master
+#     scheduler over UDP, parses the returned schedule entries, and submits
+#     accepted commands to a local ``CommandScheduler`` instance.
+#     """
+
+#     def __init__(
+#         self,
+#         host,
+#         port,
+#         scheduler,
+#         logger,
+#         process_command: Callable[[], Any], #function
+#         computer_id,
+#         device_id,
+#         timeout=5,
+#         poll_interval=5
+#     ):
+#         """
+#         Initialize the scheduler poller.
+
+#         Args:
+#             host: Hostname or IP address of the scheduler server.
+#             port: UDP port of the scheduler server.
+#             scheduler: Local scheduler used to queue accepted commands.
+#             timeout: Socket timeout in seconds.
+#             poll_interval: Delay between polling attempts in seconds.
+#         """
+#         self.host = host
+#         self.port = port
+#         self.scheduler = scheduler
+#         self.logger = logger
+#         self.process_command = process_command
+#         self.computer_id = computer_id
+#         self.device_id = device_id
+    
+#         self.client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#         self.timeout = timeout
+#         self.poll_interval = poll_interval
+
+#         self.logger.warning(
+#             "%s: starting master polling thread",
+#             self.device_id
+#         )
+
+#         self.client.settimeout(self.timeout)
+
+#     def start_polling_scheduler_server(self):
+#         """
+#         Start the scheduler polling thread.
+
+#         The polling thread periodically contacts the remote scheduler
+#         server and processes any returned schedule entries.
+#         """
+#         self._polling_scheduler_server = True
+
+#         self.poll_scheduler_server_thread = threading.Thread(
+#             target=self.poll_scheduler
+#         )
+
+#         self.poll_scheduler_server_thread.start()
+
+#         self.logger.warning(
+#             "%s: START SCHEDULER SERVER POLLING THREAD",
+#             self.device_id
+#         )
+
+#     def stop_polling_scheduler_server(self):
+#         """
+#         Stop the scheduler polling thread.
+
+#         Signals the polling loop to exit and waits for the polling thread
+#         to terminate.
+#         """
+#         self._polling_scheduler_server = False
+
+#         self.poll_scheduler_server_thread.join()
+
+#         self.logger.warning(
+#             "%s: STOP SCHEDULER SERVER POLLING THREAD",
+#             self.device_id
+#         )
+
+#     def poll_scheduler(self):
+#         """
+#         Continuously poll the remote scheduler server.
+
+#         Requests the current schedule, parses each returned schedule line,
+#         and submits valid commands to the configured scheduler. Any polling
+#         or parsing errors are logged and do not terminate the polling loop.
+#         """
+#         while self._polling_scheduler_server:
+
+#             try:
+#                 # Request all scheduled commands from the master server.
+#                 self.client.sendto(
+#                     b"/all",
+#                     (self.host, self.port)
+#                 )
+
+#                 # Receive the scheduler response payload.
+#                 response, _ = self.client.recvfrom(8192)
+
+#                 decoded = response.decode("utf-8")
+
+#                 # self.logger.info(
+#                 #     "%s: received master data:\n%s",
+#                 #     self.device_id,
+#                 #     decoded
+#                 # )
+
+#                 # Process each returned schedule entry.
+#                 lines = decoded.strip().splitlines()
+
+#                 for line in lines:
+
+#                     parsed = parse_schedule_line(
+#                         line=line,
+#                         computer_id=self.computer_id,
+#                         device_id=self.device_id
+#                     )
+
+#                     # Ignore lines that do not apply to this device.
+#                     if parsed is None:
+#                         continue
+
+#                     self.scheduler.schedule(parsed, self.process_command)
+
+#             except Exception:
+#                 self.logger.exception(
+#                     "%s: polling failed",
+#                     self.device_id
+#                 )
+
+#             # Wait before the next polling cycle.
+#             time.sleep(self.poll_interval)
 
 
 # =========================================================
@@ -603,14 +971,19 @@ class DeviceStatusReporter:
         self.device_id = device_id
         self.logger = logger
         self.interval = interval
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        self.client = socket.socket(
+            socket.AF_INET,
+            socket.SOCK_STREAM
+        )
+
+        self._running = False
+        self.thread = None
 
     def start(self):
         """
         Start the device status reporting thread.
-
-        Begins periodically collecting device status information and
-        transmitting updates to the configured UDP endpoint.
         """
         self._running = True
 
@@ -629,15 +1002,70 @@ class DeviceStatusReporter:
     def stop(self):
         """
         Stop the device status reporting thread.
-
-        Signals the reporting loop to exit and waits for the background
-        thread to terminate.
         """
         self._running = False
 
-        self.thread.join()
+        if self.thread is not None:
+            self.thread.join()
+
+        self._close_connection()
 
         self.logger.warning(
             "%s: STOP DEVICE STATUS REPORTER THREAD",
             self.device_id
         )
+
+    def _connect(self):
+        """
+        Connect to the remote TCP endpoint.
+        """
+        if self.client is None:
+            self.client = socket.socket(
+                socket.AF_INET,
+                socket.SOCK_STREAM
+            )
+
+        self.client.connect((self.host, self.port))
+
+        self.logger.info(
+            "%s: connected to %s:%d",
+            self.device_id,
+            self.host,
+            self.port
+        )
+
+    def _close_connection(self):
+        """
+        Close the TCP connection.
+        """
+        if self.client is not None:
+            try:
+                self.client.close()
+            except Exception:
+                self.logger.exception(
+                    "%s: failed to close TCP connection",
+                    self.device_id
+                )
+            finally:
+                self.client = None
+
+    def _send(self, msg):
+        """
+        Send a message over the TCP connection.
+        """
+        try:
+            if self.client is None:
+                self._connect()
+
+            self.client.sendall(msg.encode("utf-8"))
+
+        except (ConnectionError, OSError):
+            self.logger.exception(
+                "%s: TCP send failed",
+                self.device_id
+            )
+
+            # The connection may no longer be usable.
+            self._close_connection()
+
+            raise
