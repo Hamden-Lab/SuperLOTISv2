@@ -1,0 +1,15 @@
+now 10 LYMAN PDU poweroff 2
+now 20 LYMAN PDU poweron 7
+now 100 LYMAN PFEIFFER stop turbo
+now 110 LYMAN PDU poweron 1
+now 120 LYMAN CHILLER set temperature 15
+now 140 LYMAN SOPHIA set temperature -10
+now 260 LYMAN SOPHIA set temperature -40
+now 380 LYMAN SOPHIA set temperature -80
+now 390 LYMAN SOPHIA get temperature
+now 400 LYMAN SOPHIA take bias
+now 410 LYMAN SOPHIA take bias
+now 415 LYMAN SOPHIA get exptime
+now 420 LYMAN SOPHIA take dark
+now 430 LYMAN SOPHIA take dark
+now 1000 LYMAN PFEIFFER stop backing
