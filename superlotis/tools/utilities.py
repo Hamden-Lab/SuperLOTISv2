@@ -12,8 +12,7 @@ from typing import Any, Callable
 from email.message import EmailMessage
 import smtplib
 import ssl
-
-from superlotis.tools.constants import ALERT_EMAIL_ADDRESS, GOOGLE_APP_PASSWORD, ALERT_EMAIL_BODY_BASE, ALERT_EMAIL_SUBJECT_BASE, ALERT_EMAIL_RCV
+from superlotis.tools.constants import ALERT_EMAIL_ADDRESS, GOOGLE_APP_PASSWORD, ALERT_EMAIL_BODY_BASE, ALERT_EMAIL_SUBJECT_BASE, ALERT_EMAIL_RCV, TCP_BUFFER_SIZE
 
 # =========================================================
 # PARSING SCHEDULER COMMAND LINES
@@ -254,7 +253,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         closes it. Commands are expected to be newline-delimited.
         """
         try:
-            data = self.request.recv(8192)
+            data = self.request.recv(TCP_BUFFER_SIZE)
 
             if not data:
                 return
@@ -482,14 +481,13 @@ class SchedulerPoller(object):
                 )
 
                 # Receive the scheduler response payload.
-                response = client.recv(2*8192)
-
+                response = client.recv(TCP_BUFFER_SIZE)
 
                 # # NOTE: dangerous chatgpt edit
                 # chunks = []
 
                 # while True:
-                #     chunk = client.recv(8192)
+                #     chunk = client.recv(TCP_BUFFER_SIZE)
 
                 #     if not chunk:
                 #         break
@@ -696,6 +694,8 @@ class DeviceStatusReporter:
             socket.SOCK_STREAM
         )
 
+        self._connect()
+
         self._running = False
         self.thread = None
 
@@ -787,3 +787,46 @@ class DeviceStatusReporter:
             self._close_connection()
 
             raise
+
+
+
+def parse_status_response(data: bytes) -> dict:
+    """
+    Parse the status server response.
+
+    Expected format:
+
+        key value
+        key value
+        ...
+        .EOF
+
+    Only the first whitespace separates the key from the value,
+    so values are allowed to contain spaces.
+    """
+
+    status = {}
+
+    text = data.decode("utf-8")
+
+    for line in text.splitlines():
+        line = line.strip()
+
+        if not line:
+            continue
+
+        if line == ".EOF":
+            break
+
+        # Split only on the first whitespace.
+        parts = line.split(None, 1)
+
+        if len(parts) != 2:
+            print(f"Skipping malformed status line: {line}")
+            continue
+
+        key, value = parts
+
+        status[key] = value
+
+    return status
