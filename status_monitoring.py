@@ -1,25 +1,68 @@
-import json
 import socket
 from datetime import datetime, timezone
 import time
+
 from influxdb_client_3 import InfluxDBClient3, Point
 
+from superlotis.tools.utilities import parse_status_response
+
 from superlotis.tools.constants import (
-    TEST_STATUS_SERVER_HOST,
-    TEST_STATUS_SERVER_PORT, INFLUXDB_TOKEN, INFLUXDB_DATABASE, INFLUXDB_HOST
+    SLOTIS_STATUS_SERVER_IP_ADDRESS,
+    SLOTIS_STATUS_SERVER_PORT,
+    INFLUXDB_TOKEN,
+    INFLUXDB_DATABASE,
+    INFLUXDB_HOST, TCP_BUFFER_SIZE
 )
 
-UDP_HOST = TEST_STATUS_SERVER_HOST
-UDP_PORT = TEST_STATUS_SERVER_PORT
-BUFFER_SIZE = 4096
+TCP_HOST = SLOTIS_STATUS_SERVER_IP_ADDRESS
+TCP_PORT = SLOTIS_STATUS_SERVER_PORT
 
 MEASUREMENT = "devices_status"
 
 client = InfluxDBClient3(
-        host=INFLUXDB_HOST,
-        database=INFLUXDB_DATABASE,
-        token=INFLUXDB_TOKEN,
-    )
+    host=INFLUXDB_HOST,
+    database=INFLUXDB_DATABASE,
+    token=INFLUXDB_TOKEN,
+)
+
+
+def convert_value(value: str):
+    """
+    Convert a status value to an appropriate Python type.
+
+    Integer-looking values become int.
+    Decimal/exponent values become float.
+    Boolean values become bool.
+    'None' becomes None.
+    Everything else remains a string.
+    """
+
+    value = value.strip()
+
+    if value == "None":
+        return None
+
+    if value.lower() == "true":
+        return True
+
+    if value.lower() == "false":
+        return False
+
+    # Integer
+    try:
+        return int(value)
+    except ValueError:
+        pass
+
+    # Float / scientific notation
+    try:
+        return float(value)
+    except ValueError:
+        pass
+
+    return value
+
+
 
 def write_status_to_influxdb(status: dict) -> None:
     """
@@ -29,51 +72,80 @@ def write_status_to_influxdb(status: dict) -> None:
 
     point = Point(MEASUREMENT).time(datetime.now(timezone.utc))
 
+    written = 0
+
     for key, value in status.items():
-        if isinstance(value, (dict, list)):
+        value = convert_value(value)
+
+        # InfluxDB fields cannot be None.
+        if value is None:
             continue
 
         point = point.field(field=key, value=value)
+        written += 1
 
     client.write(record=point)
 
     print(
         f"{datetime.now(timezone.utc).isoformat()} | "
-        f"INFLUXDB | Written {len(status)} fields"
+        f"INFLUXDB | Written {written} fields"
     )
 
 
-with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-    sock.settimeout(2.0)
+while True:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(5.0)
+            sock.connect((TCP_HOST, TCP_PORT))
+            sock.sendall(b"get all")
 
-    while True:
-        try:
-            # Send request to status server
-            sock.sendto(b"get all", (UDP_HOST, UDP_PORT))
+            chunks = []
 
-            data, _ = sock.recvfrom(BUFFER_SIZE)
+            while True:
+                try:
+                    data = sock.recv(TCP_BUFFER_SIZE)
 
-            # Decode JSON response into a Python dict
-            status = json.loads(data.decode("utf-8"))
+                    if not data:
+                        break
 
-            print(
-                f"{datetime.now(timezone.utc).isoformat()} | "
-                f"STATUS SERVER | Received status of {len(status)} fields"
-            )
+                    chunks.append(data)
 
-            # Write status to InfluxDB
-            write_status_to_influxdb(status)
+                    if b"\n.EOF" in data or data.endswith(b".EOF\n"):
+                        break
 
-            time.sleep(5)
+                except socket.timeout:
+                    break
 
-        except socket.timeout:
-            print("Timed out waiting for response from status server.")
+            data = b"".join(chunks)
 
-        except json.JSONDecodeError as exc:
-            print(f"Invalid JSON received from status server: {exc}")
+        print(
+            f"{datetime.now(timezone.utc).isoformat()} | "
+            f"STATUS SERVER | Received {len(data)} bytes"
+        )
 
-        except Exception as exc:
-            print(f"Failed to write status to InfluxDB: {exc}")
+        status = parse_status_response(data)
 
-        except KeyboardInterrupt:
-            break
+        print(
+            f"{datetime.now(timezone.utc).isoformat()} | "
+            f"STATUS SERVER | Parsed {len(status)} fields"
+        )
+
+        write_status_to_influxdb(status)
+
+    except socket.timeout:
+        print("Timed out waiting for response from status server.")
+
+    except ConnectionRefusedError:
+        print("Connection refused by status server.")
+
+    except ConnectionResetError:
+        print("Connection reset by status server.")
+
+    except UnicodeDecodeError as exc:
+        print(f"Invalid UTF-8 received from status server: {exc}")
+
+    except Exception as exc:
+        print(f"Failed to write status to InfluxDB: {exc}")
+
+    finally:
+        time.sleep(5)
