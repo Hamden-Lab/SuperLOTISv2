@@ -15,11 +15,10 @@ wt --title "Camera" --tabColor "#00ccff" --suppressApplicationTitle cmd /k "%sup
 
 ; nt --title "Chiller" --tabColor "#9900ff" --suppressApplicationTitle cmd /k "%superlotis% && cd /d %ClientsDir%\chiller && ipython -i -c "%%run chiller_client.py" " ^
 
-; nt --title "test_scheduler" --tabColor "#000000" --suppressApplicationTitle cmd /k "%superlotis% && cd /d %RootDir% && ipython -i -c "%%run scheduler_emulator.py" " ^
-
-; nt --title "test_status" --tabColor "#000000" --suppressApplicationTitle cmd /k "%superlotis% && cd /d %RootDir% && ipython -i -c "%%run status_server_emulator.py" " ^
-
 ; nt --title "influxdb3" --tabColor "#000000" --suppressApplicationTitle cmd /k "%superlotis% && cd /d %RootDir% && influxdb3 " ^
 
 ; nt --title "status_monitoring" --tabColor "#000000" --suppressApplicationTitle cmd /k "%superlotis% && cd /d %RootDir% && ipython -i -c "%%run status_monitoring.py" " 
 
+@REM ; nt --title "test_scheduler" --tabColor "#000000" --suppressApplicationTitle cmd /k "%superlotis% && cd /d %RootDir% && ipython -i -c "%%run scheduler_emulator.py" " ^
+
+@REM ; nt --title "test_status" --tabColor "#000000" --suppressApplicationTitle cmd /k "%superlotis% && cd /d %RootDir% && ipython -i -c "%%run status_server_emulator.py" " ^
