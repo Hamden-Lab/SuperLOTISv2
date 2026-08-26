@@ -1,6 +1,13 @@
 # SuperLOTISv2
 Repo containing code for SuperLOTIS upgrade (SOPHIA camera, Pfeiffer Vacuum Pump and INFICON Vacuum Gauge)
 
+
+## TODO
+- [X] correct the bug at initialization of clients
+- [] reimplement email in except error management in report_loop method
+- [] fits image header not populated as expected
+- [] test to take dark once again
+
 ## Issues
 - KS : SOPHIA camera does not work through the StarTech USB Hub. Probable cause(s): https://chatgpt.com/s/t_6a70db7d7ffc81919d7addffe3072537, but works through the single 15ft USB3.0 cable. Needs to buy another one I guess.
 
