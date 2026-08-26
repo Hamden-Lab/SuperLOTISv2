@@ -2,12 +2,12 @@ from pathlib import Path
 from datetime import datetime
 from astropy.io import fits
 import socket
-import json
-from superlotis.tools.constants import SOPHIA_SN, SOPHIA_FRAME_TIMEOUT, SLOTIS_STATUS_SERVER_IP_ADDRESS, SLOTIS_STATUS_SERVER_PORT
+from superlotis.tools.utilities import parse_status_response
+from superlotis.tools.constants import SOPHIA_SN, SOPHIA_FRAME_TIMEOUT, SLOTIS_STATUS_SERVER_IP_ADDRESS, SLOTIS_STATUS_SERVER_PORT, TCP_BUFFER_SIZE
 import pylablib as pll
 pll.par["devices/dlls/picam"] = r"C:\Program Files\Princeton Instruments\PICam\Runtime"
 from pylablib.devices import PrincetonInstruments
- 
+
 
 class SOPHIA(object):
     """
@@ -67,12 +67,32 @@ class SOPHIA(object):
         # Query SLOTIS status server for all variables.
         # This following block should go in the client code.
         try:
-            client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            client.settimeout(2.0)
-            client.sendto(b"get all", (SLOTIS_STATUS_SERVER_IP_ADDRESS, SLOTIS_STATUS_SERVER_PORT))
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5.0)
+            sock.connect((SLOTIS_STATUS_SERVER_IP_ADDRESS, SLOTIS_STATUS_SERVER_PORT))
+            msg = "get all"
+            sock.sendall(msg.encode("utf-8"))
 
-            data, _ = client.recvfrom(8192)
-            status = json.loads(data.decode("utf-8"))
+            chunks = []
+
+            while True:
+                try:
+                    data = sock.recv(TCP_BUFFER_SIZE)
+
+                    if not data:
+                        break
+
+                    chunks.append(data)
+
+                    if b"\n.EOF" in data or data.endswith(b".EOF\n"):
+                        break
+
+                except socket.timeout:
+                    break
+
+            data = b"".join(chunks)
+
+            status = parse_status_response(data)
 
             # Populate header with returned status keys using HIERARCH for long names
             for key, val in status.items():
