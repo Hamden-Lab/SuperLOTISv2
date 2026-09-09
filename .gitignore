@@ -217,9 +217,14 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Logs
 logs/
 
+# Data
 *.csv
+
+# Plots
+*.png
 
 # Solidworks
 [~][$]*.sldprt
