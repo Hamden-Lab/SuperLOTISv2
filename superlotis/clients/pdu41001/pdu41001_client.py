@@ -190,9 +190,8 @@ class OutletStatusReporter(DeviceStatusReporter):
 
         # KS: required to avoid crash when starting client...
         time.sleep(5)
-        print('here there')
+
         while self._running:
-            print('there there')
             try:
                 if self.client is None:
                     self._connect()
@@ -205,8 +204,6 @@ class OutletStatusReporter(DeviceStatusReporter):
                     )[0]["status"].lower()
 
                     msg = f"set pdu_outlet_{outlet:d} {status}\n"
-
-                    print('here here')
 
                     self._send(msg)
 
@@ -247,6 +244,12 @@ class OutletStatusReporter(DeviceStatusReporter):
 
                 # Force a reconnect on the next iteration.
                 self._close_connection()
+
+                current_time = time.time()
+
+                if consecutive_failures == 5 or (current_time - last_email_alert_time) >= ALERT_INTERVAL_SECONDS:
+                        send_email_alert(DEVICE_ID, f"Reporting failed {consecutive_failures} times in a row. Check the device connection.")
+                        last_email_alert_time = current_time
 
                 # try:
                 #     if pdu.is_open():
