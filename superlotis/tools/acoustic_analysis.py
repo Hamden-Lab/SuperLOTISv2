@@ -28,7 +28,7 @@ from pathlib import Path
 # ============================================================
 
 # Change this to your data file
-INPUT_FILE = r"C:\Users\superlotis\Documents\GitHub\SuperLOTISv2\superlotis\data\2026-09-08T22-00-45.445579+00-00_accelerometer_data.csv"
+INPUT_FILE = r"C:\Users\superlotis\Documents\GitHub\SuperLOTISv2\superlotis\data\2026-11-05T18-46-29.373549+00-00_accelerometer_data.csv"
 
 # Number of strongest frequencies to report
 N_PEAKS = 10
@@ -435,8 +435,6 @@ fft_df = pd.DataFrame({
 
 
 
-
-
 # fft_output_file = (
 #     INPUT_FILE.parent /
 #     f"{INPUT_FILE.stem}_fft.csv"
@@ -451,5 +449,68 @@ fft_df = pd.DataFrame({
 
 print()
 print("Analysis complete.")
+
+plt.show()
+
+
+
+
+
+# ============================================================
+# Plot FFT Amplitude Ratios (Accelerometer 1 / 2)
+# ============================================================
+
+
+axis_names = ["Mag"]
+
+
+fig, axes = plt.subplots(
+    len(axis_names),
+    1,
+    figsize=(12, 12),
+    sharex=True
+)
+
+for i, axis in enumerate(axis_names):
+
+    name1 = f"Accel 1 {axis}"
+    name2 = f"Accel 2 {axis}"
+
+    freq = fft_results[name1]["frequency_hz"]
+
+    amp1 = fft_results[name1]["amplitude_mps2"]
+    amp2 = fft_results[name2]["amplitude_mps2"]
+
+    # Avoid division by zero
+    ratio = np.divide(
+        amp1,
+        amp2,
+        out=np.full_like(amp1, np.nan),
+        where=amp2 > 0
+    )
+
+    axes.plot(
+        freq,
+        ratio,
+        label=f"Accel 1 / Accel 2 ({axis})",
+        color=["tab:red", "tab:green", "tab:blue", "black"][i]
+    )
+
+    # Reference ratio = 1
+    axes.axhline(
+        1.0,
+        color="gray",
+        linestyle="--",
+        alpha=0.7
+    )
+
+    axes.set_title(f"{axis} Amplitude Ratio")
+    axes.set_ylabel("Amplitude Ratio")
+    axes.grid(True)
+    axes.legend()
+
+axes.set_xlabel("Frequency (Hz)")
+
+plt.tight_layout()
 
 plt.show()

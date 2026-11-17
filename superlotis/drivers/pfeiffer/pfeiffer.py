@@ -29,8 +29,8 @@ class Pfeiffer:
 
     def get_status(self):
 
-        self.status_dict = {"backing_temperature": self.backing.temperature,
-                            "backing_power": self.backing.pumping_power,
+        self.status_dict = {"backing_power": self.backing.pumping_power,
+                            "backing_temperature": self.backing.temperature,
                             "backing_pump_speed": self.backing.actual_speed,
                             "backing_driving_voltage": self.backing.drv_voltage,
                             "backing_driving_current": self.backing.drv_current,
